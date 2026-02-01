@@ -2,22 +2,28 @@ package ai.rever.boss.plugin.dynamic.usersecretlist
 
 import ai.rever.boss.plugin.api.PanelComponentWithUI
 import ai.rever.boss.plugin.api.PanelInfo
+import ai.rever.boss.plugin.api.SecretDataProvider
 import androidx.compose.runtime.Composable
 import com.arkivanov.decompose.ComponentContext
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * My Secrets panel component (Dynamic Plugin)
  *
- * This is a stub implementation. Full functionality requires
- * host services not yet exposed through PluginContext.
+ * Provides read-only view of user's secrets and shared credentials.
  */
 class UserSecretListComponent(
     ctx: ComponentContext,
-    override val panelInfo: PanelInfo
+    override val panelInfo: PanelInfo,
+    private val secretDataProvider: SecretDataProvider?,
+    private val scope: CoroutineScope
 ) : PanelComponentWithUI, ComponentContext by ctx {
 
     @Composable
     override fun Content() {
-        UserSecretListContent()
+        UserSecretListContent(
+            secretDataProvider = secretDataProvider,
+            scope = scope
+        )
     }
 }
