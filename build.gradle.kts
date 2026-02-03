@@ -40,6 +40,9 @@ dependencies {
     implementation(compose.foundation)
     implementation(compose.material)
     implementation(compose.materialIconsExtended)
+
+    // Compose Icons (FeatherIcons)
+    implementation("br.com.devsrsouza.compose.icons:feather:1.1.1")
     
     // Decompose for ComponentContext
     implementation("com.arkivanov.decompose:decompose:3.3.0")
