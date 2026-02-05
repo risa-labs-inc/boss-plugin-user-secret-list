@@ -5,6 +5,16 @@ import ai.rever.boss.plugin.api.SecretEntryWithSharingData
 import ai.rever.boss.plugin.scrollbar.getPanelScrollbarConfig
 import ai.rever.boss.plugin.scrollbar.lazyListScrollbar
 import ai.rever.boss.plugin.ui.BossTheme
+import ai.rever.boss.plugin.ui.BossDarkBackground
+import ai.rever.boss.plugin.ui.BossDarkSurface
+import ai.rever.boss.plugin.ui.BossDarkBorder
+import ai.rever.boss.plugin.ui.BossDarkTextPrimary
+import ai.rever.boss.plugin.ui.BossDarkTextSecondary
+import ai.rever.boss.plugin.ui.BossDarkTextMuted
+import ai.rever.boss.plugin.ui.BossDarkAccent
+import ai.rever.boss.plugin.ui.BossDarkSuccess
+import ai.rever.boss.plugin.ui.BossDarkWarning
+import ai.rever.boss.plugin.ui.BossDarkError
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,15 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-
-// Theme colors
-private val BossDarkBackground = Color(0xFF2B2D30)
-private val BossDarkSurface = Color(0xFF3C3F41)
-private val BossDarkBorder = Color(0xFF4E5254)
-private val BossDarkTextSecondary = Color(0xFF9E9E9E)
-private val BossGreen = Color(0xFF4CAF50)
-private val BossBlue = Color(0xFF64B5F6)
-private val BossOrange = Color(0xFFFFB74D)
 
 @Composable
 fun UserSecretListContent(
@@ -72,12 +73,12 @@ fun UserSecretListContent(
                             Icon(
                                 Icons.Default.VpnKey,
                                 contentDescription = "My Secrets",
-                                tint = BossGreen,
+                                tint = BossDarkSuccess,
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
                                 "My Secrets",
-                                color = Color.White,
+                                color = BossDarkTextPrimary,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -91,7 +92,7 @@ fun UserSecretListContent(
                             Icon(
                                 Icons.Default.Refresh,
                                 contentDescription = "Refresh",
-                                tint = Color.White
+                                tint = BossDarkTextPrimary
                             )
                         }
                     }
@@ -110,7 +111,7 @@ fun UserSecretListContent(
                         } else {
                             "${state.secrets.size} result${if (state.secrets.size != 1) "s" else ""} for '${state.searchQuery}'"
                         },
-                        color = Color.Gray,
+                        color = BossDarkTextSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -166,8 +167,8 @@ private fun UserSecretSearchBar(
             .border(1.dp, BossDarkBorder, RoundedCornerShape(6.dp))
             .padding(horizontal = 12.dp),
         singleLine = true,
-        textStyle = MaterialTheme.typography.body2.copy(color = Color.White),
-        cursorBrush = SolidColor(BossGreen),
+        textStyle = MaterialTheme.typography.body2.copy(color = BossDarkTextPrimary),
+        cursorBrush = SolidColor(BossDarkSuccess),
         decorationBox = { innerTextField ->
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -257,7 +258,7 @@ private fun UserSecretList(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = BossGreen,
+                        color = BossDarkSuccess,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -269,7 +270,7 @@ private fun UserSecretList(
             item {
                 Text(
                     "- End of list -",
-                    color = Color.Gray,
+                    color = BossDarkTextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -292,6 +293,7 @@ private fun UserSecretCard(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val isApiKey = secret.tags.contains("api_key")
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -303,7 +305,7 @@ private fun UserSecretCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header: Website, Username, and Ownership Badge
+            // Header: Website/Service, Username/Key Name, and Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -313,20 +315,20 @@ private fun UserSecretCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Website with icon
+                    // Website/Service with icon
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            Icons.Default.Language,
-                            contentDescription = "Website",
-                            tint = Color.Gray,
+                            if (isApiKey) Icons.Default.Api else Icons.Default.Language,
+                            contentDescription = if (isApiKey) "Service" else "Website",
+                            tint = if (isApiKey) BossDarkWarning else Color.Gray,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = secret.website,
-                            color = Color.White,
+                            color = BossDarkTextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -334,20 +336,20 @@ private fun UserSecretCard(
                         )
                     }
 
-                    // Username with icon
+                    // Username/Key Name with icon
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            Icons.Default.Person,
-                            contentDescription = "Username",
-                            tint = Color.Gray,
+                            if (isApiKey) Icons.Default.Key else Icons.Default.Person,
+                            contentDescription = if (isApiKey) "Key Name" else "Username",
+                            tint = BossDarkTextSecondary,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = secret.username,
-                            color = Color.Gray,
+                            color = BossDarkTextSecondary,
                             fontSize = 14.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -355,56 +357,141 @@ private fun UserSecretCard(
                     }
                 }
 
-                // Ownership badge
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (secret.isOwner) BossGreen else BossBlue,
+                // Badges column
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // API Key badge (if applicable)
+                    if (isApiKey) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = BossDarkWarning
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Key,
+                                    contentDescription = "API Key",
+                                    tint = BossDarkTextPrimary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "API Key",
+                                    color = BossDarkTextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // Ownership badge
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (secret.isOwner) BossDarkSuccess else BossDarkAccent
                     ) {
-                        Icon(
-                            if (secret.isOwner) Icons.Default.Person else Icons.Default.Share,
-                            contentDescription = if (secret.isOwner) "Owner" else "Shared",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = if (secret.isOwner) "Owner" else "Shared",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (secret.isOwner) Icons.Default.Person else Icons.Default.Share,
+                                contentDescription = if (secret.isOwner) "Owner" else "Shared",
+                                tint = BossDarkTextPrimary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = if (secret.isOwner) "Owner" else "Shared",
+                                color = BossDarkTextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
 
             Divider(color = BossDarkBorder, thickness = 1.dp)
 
-            // Action button: Copy Username only
-            Button(
-                onClick = {
-                    scope.launch {
-                        clipboardManager.setText(AnnotatedString(secret.username))
+            // Action buttons
+            if (isApiKey) {
+                // For API Keys: Copy API Key button (primary) and Copy Key Name button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                clipboardManager.setText(AnnotatedString(secret.password))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = BossDarkWarning,
+                            contentColor = BossDarkTextPrimary
+                        ),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Key,
+                            contentDescription = "Copy API Key",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Copy API Key", fontSize = 12.sp)
                     }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = BossDarkBackground,
-                    contentColor = BossBlue
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(8.dp)
-            ) {
-                Icon(
-                    Icons.Default.ContentCopy,
-                    contentDescription = "Copy Username",
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text("Copy Username", fontSize = 12.sp)
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                clipboardManager.setText(AnnotatedString(secret.username))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = BossDarkBackground,
+                            contentColor = BossDarkAccent
+                        ),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Copy Key Name",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Copy Name", fontSize = 12.sp)
+                    }
+                }
+            } else {
+                // For regular secrets: Copy Username only
+                Button(
+                    onClick = {
+                        scope.launch {
+                            clipboardManager.setText(AnnotatedString(secret.username))
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = BossDarkBackground,
+                        contentColor = BossDarkAccent
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Copy Username",
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Copy Username", fontSize = 12.sp)
+                }
             }
 
             // Shared by information (only for shared secrets)
@@ -420,12 +507,12 @@ private fun UserSecretCard(
                     Icon(
                         Icons.Default.PersonAdd,
                         contentDescription = "Shared by",
-                        tint = BossBlue,
+                        tint = BossDarkAccent,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         "Shared by: ${secret.sharedByEmail}",
-                        color = Color.Gray,
+                        color = BossDarkTextSecondary,
                         fontSize = 12.sp
                     )
                 }
@@ -443,14 +530,14 @@ private fun UserSecretCard(
                 ) {
                     Text(
                         if (isMetadataExpanded) "Hide Details" else "Show Details",
-                        color = BossGreen,
+                        color = BossDarkSuccess,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Icon(
                         if (isMetadataExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (isMetadataExpanded) "Hide" else "Show",
-                        tint = BossGreen,
+                        tint = BossDarkSuccess,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -473,12 +560,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Label,
                                     contentDescription = "Tags",
-                                    tint = BossGreen,
+                                    tint = BossDarkSuccess,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     secret.tags.joinToString(", "),
-                                    color = Color.White,
+                                    color = BossDarkTextPrimary,
                                     fontSize = 12.sp
                                 )
                             }
@@ -494,12 +581,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Notes,
                                     contentDescription = "Notes",
-                                    tint = Color.Gray,
+                                    tint = BossDarkTextSecondary,
                                     modifier = Modifier.size(14.dp).padding(top = 2.dp)
                                 )
                                 Text(
                                     notes,
-                                    color = Color.Gray,
+                                    color = BossDarkTextSecondary,
                                     fontSize = 12.sp
                                 )
                             }
@@ -515,12 +602,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Event,
                                     contentDescription = "Expires",
-                                    tint = BossOrange,
+                                    tint = BossDarkWarning,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     "Expires: $expirationDate",
-                                    color = BossOrange,
+                                    color = BossDarkWarning,
                                     fontSize = 12.sp
                                 )
                             }
@@ -534,12 +621,12 @@ private fun UserSecretCard(
                             Icon(
                                 Icons.Default.Schedule,
                                 contentDescription = "Created",
-                                tint = Color.Gray,
+                                tint = BossDarkTextSecondary,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 "Created: ${secret.createdAt}",
-                                color = Color.Gray,
+                                color = BossDarkTextSecondary,
                                 fontSize = 11.sp
                             )
                         }
@@ -563,10 +650,10 @@ private fun UserSecretLoadingView() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CircularProgressIndicator(color = BossGreen)
+            CircularProgressIndicator(color = BossDarkSuccess)
             Text(
                 "Loading your secrets...",
-                color = Color.Gray,
+                color = BossDarkTextSecondary,
                 fontSize = 14.sp
             )
         }
@@ -593,13 +680,13 @@ private fun UserSecretErrorView(
         ) {
             Text(
                 "Error",
-                color = Color(0xFFE57373),
+                color = BossDarkError,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 message,
-                color = Color.Gray,
+                color = BossDarkTextSecondary,
                 fontSize = 14.sp
             )
             Row(
@@ -608,13 +695,13 @@ private fun UserSecretErrorView(
                 Button(
                     onClick = onRetry,
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = BossGreen
+                        backgroundColor = BossDarkSuccess
                     )
                 ) {
-                    Text("Retry", color = Color.White)
+                    Text("Retry", color = BossDarkTextPrimary)
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Dismiss", color = Color.Gray)
+                    Text("Dismiss", color = BossDarkTextSecondary)
                 }
             }
         }
@@ -639,36 +726,36 @@ private fun UserSecretEmptyView(searchQuery: String) {
                 Icon(
                     Icons.Default.VpnKey,
                     contentDescription = "No secrets",
-                    tint = Color.Gray,
+                    tint = BossDarkTextSecondary,
                     modifier = Modifier.size(64.dp)
                 )
                 Text(
                     "No secrets found",
-                    color = Color.White,
+                    color = BossDarkTextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     "You don't have any secrets yet, or none have been shared with you.",
-                    color = Color.Gray,
+                    color = BossDarkTextSecondary,
                     fontSize = 14.sp
                 )
             } else {
                 Icon(
                     Icons.Default.Search,
                     contentDescription = "No results",
-                    tint = Color.Gray,
+                    tint = BossDarkTextSecondary,
                     modifier = Modifier.size(64.dp)
                 )
                 Text(
                     "No results found",
-                    color = Color.White,
+                    color = BossDarkTextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     "Try a different search term",
-                    color = Color.Gray,
+                    color = BossDarkTextSecondary,
                     fontSize = 14.sp
                 )
             }
