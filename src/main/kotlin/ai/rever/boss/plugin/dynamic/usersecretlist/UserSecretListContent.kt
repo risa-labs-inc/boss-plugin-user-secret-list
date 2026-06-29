@@ -46,7 +46,7 @@ fun UserSecretListContent(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(BossThemeColors.SurfaceColor)
+                    .background(BossThemeColors.BackgroundColor)
                     .padding(16.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -153,7 +153,7 @@ private fun UserSecretSearchBar(
         onValueChange = onQueryChange,
         modifier = modifier
             .height(36.dp)
-            .background(BossThemeColors.SurfaceColor, RoundedCornerShape(6.dp))
+            .background(BossThemeColors.BackgroundColor, RoundedCornerShape(6.dp))
             .border(1.dp, BossThemeColors.BorderColor, RoundedCornerShape(6.dp))
             .padding(horizontal = 12.dp),
         singleLine = true,
@@ -444,7 +444,7 @@ private fun UserSecretCard(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            backgroundColor = BossThemeColors.SurfaceColor,
+                            backgroundColor = BossThemeColors.BackgroundColor,
                             contentColor = BossThemeColors.AccentColor
                         ),
                         modifier = Modifier.weight(1f),
@@ -468,7 +468,7 @@ private fun UserSecretCard(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = BossThemeColors.SurfaceColor,
+                        backgroundColor = BossThemeColors.BackgroundColor,
                         contentColor = BossThemeColors.AccentColor
                     ),
                     modifier = Modifier.fillMaxWidth(),
@@ -491,7 +491,7 @@ private fun UserSecretCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BossThemeColors.SurfaceColor, RoundedCornerShape(4.dp))
+                        .background(BossThemeColors.BackgroundColor, RoundedCornerShape(4.dp))
                         .padding(8.dp)
                 ) {
                     Icon(
@@ -537,7 +537,7 @@ private fun UserSecretCard(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BossThemeColors.SurfaceColor, RoundedCornerShape(4.dp))
+                            .background(BossThemeColors.BackgroundColor, RoundedCornerShape(4.dp))
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
