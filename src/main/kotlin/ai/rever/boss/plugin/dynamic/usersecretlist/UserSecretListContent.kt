@@ -5,16 +5,7 @@ import ai.rever.boss.plugin.api.SecretEntryWithSharingData
 import ai.rever.boss.plugin.scrollbar.getPanelScrollbarConfig
 import ai.rever.boss.plugin.scrollbar.lazyListScrollbar
 import ai.rever.boss.plugin.ui.BossTheme
-import ai.rever.boss.plugin.ui.BossDarkBackground
-import ai.rever.boss.plugin.ui.BossDarkSurface
-import ai.rever.boss.plugin.ui.BossDarkBorder
-import ai.rever.boss.plugin.ui.BossDarkTextPrimary
-import ai.rever.boss.plugin.ui.BossDarkTextSecondary
-import ai.rever.boss.plugin.ui.BossDarkTextMuted
-import ai.rever.boss.plugin.ui.BossDarkAccent
-import ai.rever.boss.plugin.ui.BossDarkSuccess
-import ai.rever.boss.plugin.ui.BossDarkWarning
-import ai.rever.boss.plugin.ui.BossDarkError
+import ai.rever.boss.plugin.ui.BossThemeColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,7 +23,6 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -56,7 +46,7 @@ fun UserSecretListContent(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(BossDarkBackground)
+                    .background(BossThemeColors.SurfaceColor)
                     .padding(16.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -73,12 +63,12 @@ fun UserSecretListContent(
                             Icon(
                                 Icons.Default.VpnKey,
                                 contentDescription = "My Secrets",
-                                tint = BossDarkSuccess,
+                                tint = BossThemeColors.SuccessColor,
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
                                 "My Secrets",
-                                color = BossDarkTextPrimary,
+                                color = BossThemeColors.TextPrimary,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -92,7 +82,7 @@ fun UserSecretListContent(
                             Icon(
                                 Icons.Default.Refresh,
                                 contentDescription = "Refresh",
-                                tint = BossDarkTextPrimary
+                                tint = BossThemeColors.TextPrimary
                             )
                         }
                     }
@@ -111,7 +101,7 @@ fun UserSecretListContent(
                         } else {
                             "${state.secrets.size} result${if (state.secrets.size != 1) "s" else ""} for '${state.searchQuery}'"
                         },
-                        color = BossDarkTextSecondary,
+                        color = BossThemeColors.TextSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -163,12 +153,12 @@ private fun UserSecretSearchBar(
         onValueChange = onQueryChange,
         modifier = modifier
             .height(36.dp)
-            .background(BossDarkBackground, RoundedCornerShape(6.dp))
-            .border(1.dp, BossDarkBorder, RoundedCornerShape(6.dp))
+            .background(BossThemeColors.SurfaceColor, RoundedCornerShape(6.dp))
+            .border(1.dp, BossThemeColors.BorderColor, RoundedCornerShape(6.dp))
             .padding(horizontal = 12.dp),
         singleLine = true,
-        textStyle = MaterialTheme.typography.body2.copy(color = BossDarkTextPrimary),
-        cursorBrush = SolidColor(BossDarkSuccess),
+        textStyle = MaterialTheme.typography.body2.copy(color = BossThemeColors.TextPrimary),
+        cursorBrush = SolidColor(BossThemeColors.SuccessColor),
         decorationBox = { innerTextField ->
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -178,14 +168,14 @@ private fun UserSecretSearchBar(
                     Icons.Default.Search,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = BossDarkTextSecondary
+                    tint = BossThemeColors.TextSecondary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(modifier = Modifier.weight(1f)) {
                     if (query.isEmpty()) {
                         Text(
                             "Search by website or username...",
-                            color = BossDarkTextSecondary,
+                            color = BossThemeColors.TextSecondary,
                             fontSize = 13.sp
                         )
                     }
@@ -258,7 +248,7 @@ private fun UserSecretList(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = BossDarkSuccess,
+                        color = BossThemeColors.SuccessColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -270,7 +260,7 @@ private fun UserSecretList(
             item {
                 Text(
                     "- End of list -",
-                    color = BossDarkTextSecondary,
+                    color = BossThemeColors.TextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -298,7 +288,7 @@ private fun UserSecretCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        backgroundColor = BossDarkSurface,
+        backgroundColor = BossThemeColors.SurfaceColor,
         elevation = 2.dp
     ) {
         Column(
@@ -323,12 +313,12 @@ private fun UserSecretCard(
                         Icon(
                             if (isApiKey) Icons.Default.Api else Icons.Default.Language,
                             contentDescription = if (isApiKey) "Service" else "Website",
-                            tint = if (isApiKey) BossDarkWarning else Color.Gray,
+                            tint = if (isApiKey) BossThemeColors.WarningColor else BossThemeColors.TextSecondary,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = secret.website,
-                            color = BossDarkTextPrimary,
+                            color = BossThemeColors.TextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -344,12 +334,12 @@ private fun UserSecretCard(
                         Icon(
                             if (isApiKey) Icons.Default.Key else Icons.Default.Person,
                             contentDescription = if (isApiKey) "Key Name" else "Username",
-                            tint = BossDarkTextSecondary,
+                            tint = BossThemeColors.TextSecondary,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = secret.username,
-                            color = BossDarkTextSecondary,
+                            color = BossThemeColors.TextSecondary,
                             fontSize = 14.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -367,7 +357,7 @@ private fun UserSecretCard(
                     if (isApiKey) {
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = BossDarkWarning
+                            color = BossThemeColors.WarningColor
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -377,12 +367,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Key,
                                     contentDescription = "API Key",
-                                    tint = BossDarkTextPrimary,
+                                    tint = BossThemeColors.TextPrimary,
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Text(
                                     text = "API Key",
-                                    color = BossDarkTextPrimary,
+                                    color = BossThemeColors.TextPrimary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -393,7 +383,7 @@ private fun UserSecretCard(
                     // Ownership badge
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = if (secret.isOwner) BossDarkSuccess else BossDarkAccent
+                        color = if (secret.isOwner) BossThemeColors.SuccessColor else BossThemeColors.AccentColor
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -403,12 +393,12 @@ private fun UserSecretCard(
                             Icon(
                                 if (secret.isOwner) Icons.Default.Person else Icons.Default.Share,
                                 contentDescription = if (secret.isOwner) "Owner" else "Shared",
-                                tint = BossDarkTextPrimary,
+                                tint = BossThemeColors.TextPrimary,
                                 modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = if (secret.isOwner) "Owner" else "Shared",
-                                color = BossDarkTextPrimary,
+                                color = BossThemeColors.TextPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -417,7 +407,7 @@ private fun UserSecretCard(
                 }
             }
 
-            Divider(color = BossDarkBorder, thickness = 1.dp)
+            Divider(color = BossThemeColors.BorderColor, thickness = 1.dp)
 
             // Action buttons
             if (isApiKey) {
@@ -433,8 +423,8 @@ private fun UserSecretCard(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            backgroundColor = BossDarkWarning,
-                            contentColor = BossDarkTextPrimary
+                            backgroundColor = BossThemeColors.WarningColor,
+                            contentColor = BossThemeColors.TextPrimary
                         ),
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(8.dp)
@@ -454,8 +444,8 @@ private fun UserSecretCard(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            backgroundColor = BossDarkBackground,
-                            contentColor = BossDarkAccent
+                            backgroundColor = BossThemeColors.SurfaceColor,
+                            contentColor = BossThemeColors.AccentColor
                         ),
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(8.dp)
@@ -478,8 +468,8 @@ private fun UserSecretCard(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = BossDarkBackground,
-                        contentColor = BossDarkAccent
+                        backgroundColor = BossThemeColors.SurfaceColor,
+                        contentColor = BossThemeColors.AccentColor
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(8.dp)
@@ -501,18 +491,18 @@ private fun UserSecretCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BossDarkBackground, RoundedCornerShape(4.dp))
+                        .background(BossThemeColors.SurfaceColor, RoundedCornerShape(4.dp))
                         .padding(8.dp)
                 ) {
                     Icon(
                         Icons.Default.PersonAdd,
                         contentDescription = "Shared by",
-                        tint = BossDarkAccent,
+                        tint = BossThemeColors.AccentColor,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         "Shared by: ${secret.sharedByEmail}",
-                        color = BossDarkTextSecondary,
+                        color = BossThemeColors.TextSecondary,
                         fontSize = 12.sp
                     )
                 }
@@ -530,14 +520,14 @@ private fun UserSecretCard(
                 ) {
                     Text(
                         if (isMetadataExpanded) "Hide Details" else "Show Details",
-                        color = BossDarkSuccess,
+                        color = BossThemeColors.SuccessColor,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Icon(
                         if (isMetadataExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (isMetadataExpanded) "Hide" else "Show",
-                        tint = BossDarkSuccess,
+                        tint = BossThemeColors.SuccessColor,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -547,7 +537,7 @@ private fun UserSecretCard(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BossDarkBackground, RoundedCornerShape(4.dp))
+                            .background(BossThemeColors.SurfaceColor, RoundedCornerShape(4.dp))
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -560,12 +550,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Label,
                                     contentDescription = "Tags",
-                                    tint = BossDarkSuccess,
+                                    tint = BossThemeColors.SuccessColor,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     secret.tags.joinToString(", "),
-                                    color = BossDarkTextPrimary,
+                                    color = BossThemeColors.TextPrimary,
                                     fontSize = 12.sp
                                 )
                             }
@@ -581,12 +571,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Notes,
                                     contentDescription = "Notes",
-                                    tint = BossDarkTextSecondary,
+                                    tint = BossThemeColors.TextSecondary,
                                     modifier = Modifier.size(14.dp).padding(top = 2.dp)
                                 )
                                 Text(
                                     notes,
-                                    color = BossDarkTextSecondary,
+                                    color = BossThemeColors.TextSecondary,
                                     fontSize = 12.sp
                                 )
                             }
@@ -602,12 +592,12 @@ private fun UserSecretCard(
                                 Icon(
                                     Icons.Default.Event,
                                     contentDescription = "Expires",
-                                    tint = BossDarkWarning,
+                                    tint = BossThemeColors.WarningColor,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     "Expires: $expirationDate",
-                                    color = BossDarkWarning,
+                                    color = BossThemeColors.WarningColor,
                                     fontSize = 12.sp
                                 )
                             }
@@ -621,12 +611,12 @@ private fun UserSecretCard(
                             Icon(
                                 Icons.Default.Schedule,
                                 contentDescription = "Created",
-                                tint = BossDarkTextSecondary,
+                                tint = BossThemeColors.TextSecondary,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 "Created: ${secret.createdAt}",
-                                color = BossDarkTextSecondary,
+                                color = BossThemeColors.TextSecondary,
                                 fontSize = 11.sp
                             )
                         }
@@ -650,10 +640,10 @@ private fun UserSecretLoadingView() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CircularProgressIndicator(color = BossDarkSuccess)
+            CircularProgressIndicator(color = BossThemeColors.SuccessColor)
             Text(
                 "Loading your secrets...",
-                color = BossDarkTextSecondary,
+                color = BossThemeColors.TextSecondary,
                 fontSize = 14.sp
             )
         }
@@ -680,13 +670,13 @@ private fun UserSecretErrorView(
         ) {
             Text(
                 "Error",
-                color = BossDarkError,
+                color = BossThemeColors.ErrorColor,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 message,
-                color = BossDarkTextSecondary,
+                color = BossThemeColors.TextSecondary,
                 fontSize = 14.sp
             )
             Row(
@@ -695,13 +685,13 @@ private fun UserSecretErrorView(
                 Button(
                     onClick = onRetry,
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = BossDarkSuccess
+                        backgroundColor = BossThemeColors.SuccessColor
                     )
                 ) {
-                    Text("Retry", color = BossDarkTextPrimary)
+                    Text("Retry", color = BossThemeColors.TextPrimary)
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Dismiss", color = BossDarkTextSecondary)
+                    Text("Dismiss", color = BossThemeColors.TextSecondary)
                 }
             }
         }
@@ -726,36 +716,36 @@ private fun UserSecretEmptyView(searchQuery: String) {
                 Icon(
                     Icons.Default.VpnKey,
                     contentDescription = "No secrets",
-                    tint = BossDarkTextSecondary,
+                    tint = BossThemeColors.TextSecondary,
                     modifier = Modifier.size(64.dp)
                 )
                 Text(
                     "No secrets found",
-                    color = BossDarkTextPrimary,
+                    color = BossThemeColors.TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     "You don't have any secrets yet, or none have been shared with you.",
-                    color = BossDarkTextSecondary,
+                    color = BossThemeColors.TextSecondary,
                     fontSize = 14.sp
                 )
             } else {
                 Icon(
                     Icons.Default.Search,
                     contentDescription = "No results",
-                    tint = BossDarkTextSecondary,
+                    tint = BossThemeColors.TextSecondary,
                     modifier = Modifier.size(64.dp)
                 )
                 Text(
                     "No results found",
-                    color = BossDarkTextPrimary,
+                    color = BossThemeColors.TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     "Try a different search term",
-                    color = BossDarkTextSecondary,
+                    color = BossThemeColors.TextSecondary,
                     fontSize = 14.sp
                 )
             }
