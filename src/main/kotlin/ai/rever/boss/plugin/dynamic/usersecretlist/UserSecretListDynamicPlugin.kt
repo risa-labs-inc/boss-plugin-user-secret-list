@@ -39,5 +39,8 @@ class UserSecretListDynamicPlugin : DynamicPlugin {
                 scope = pluginScope
             )
         }
+
+        // Contribute my_secrets_list/my_secret_get MCP tools; auto-removed on disable/unload.
+        context.registerMcpToolProvider(UserSecretListMcpToolProvider(pluginId, secretDataProvider))
     }
 }
