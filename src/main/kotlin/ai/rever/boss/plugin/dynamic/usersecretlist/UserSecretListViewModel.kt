@@ -2,6 +2,8 @@ package ai.rever.boss.plugin.dynamic.usersecretlist
 
 import ai.rever.boss.plugin.api.SecretDataProvider
 import ai.rever.boss.plugin.api.SecretEntryWithSharingData
+import ai.rever.boss.plugin.logging.BossLogger
+import ai.rever.boss.plugin.logging.LogCategory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -37,12 +39,19 @@ class UserSecretListViewModel(
         loadSecrets()
     }
 
+    private val logger = BossLogger.forComponent("UserSecretList")
+
     /**
      * Log elapsed time for a data operation so intermittent slow loads are
      * diagnosable from the host console (search for "UserSecretList").
      */
-    private fun logTiming(operation: String, startedAtMs: Long, outcome: String) {
-        println("[UserSecretList] $operation: $outcome in ${System.currentTimeMillis() - startedAtMs} ms")
+    private fun logTiming(operation: String, startedAtMs: Long, outcome: String, failed: Boolean = false) {
+        val message = "$operation: $outcome in ${System.currentTimeMillis() - startedAtMs} ms"
+        if (failed) {
+            logger.warn(LogCategory.NETWORK, message)
+        } else {
+            logger.info(LogCategory.NETWORK, message)
+        }
     }
 
     /**
@@ -91,7 +100,7 @@ class UserSecretListViewModel(
                 if (exception is CancellationException) return@onFailure
 
                 val error = exception.message ?: "Unknown error"
-                logTiming("getUserSecretsWithSharingInfo", startedAt, "FAILED: $error")
+                logTiming("getUserSecretsWithSharingInfo", startedAt, "FAILED: $error", failed = true)
                 _state.update { it.copy(
                     isLoading = false,
                     errorMessage = error
@@ -130,7 +139,8 @@ class UserSecretListViewModel(
                     secrets = if (it.searchQuery.isBlank()) allSecrets else it.secrets,
                     isLoadingMore = false,
                     currentOffset = it.currentOffset + newSecrets.size,
-                    hasMore = paginatedResult.hasMore
+                    hasMore = paginatedResult.hasMore,
+                    lastLoadDurationMs = System.currentTimeMillis() - startedAt
                 ) }
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure

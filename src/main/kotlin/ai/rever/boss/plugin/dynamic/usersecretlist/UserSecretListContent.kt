@@ -630,7 +630,7 @@ private fun UserSecretCard(
 }
 
 private fun formatLoadDuration(ms: Long): String =
-    if (ms < 1000) "${ms}ms" else "%.1fs".format(ms / 1000.0)
+    if (ms < 1000) "${ms}ms" else "${ms / 1000}.${(ms % 1000) / 100}s"
 
 /**
  * Loading view
