@@ -28,6 +28,8 @@ class UserSecretListViewModel(
     private val secretDataProvider: SecretDataProvider?,
     private val scope: CoroutineScope
 ) {
+    private val logger = BossLogger.forComponent("UserSecretList")
+
     private val _state = MutableStateFlow(UserSecretListState())
     val state: StateFlow<UserSecretListState> = _state.asStateFlow()
 
@@ -38,8 +40,6 @@ class UserSecretListViewModel(
     init {
         loadSecrets()
     }
-
-    private val logger = BossLogger.forComponent("UserSecretList")
 
     /**
      * Elapsed milliseconds since a System.nanoTime() mark — monotonic, so
