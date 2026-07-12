@@ -155,9 +155,11 @@ class UserSecretListViewModel(
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure
 
+                val error = exception.message ?: "Unknown error"
+                logTiming("getUserSecretsWithSharingInfo(offset=${currentState.currentOffset})", elapsedMs, error, failed = true)
                 _state.update { it.copy(
                     isLoadingMore = false,
-                    errorMessage = exception.message ?: "Unknown error"
+                    errorMessage = error
                 ) }
             }
         }
