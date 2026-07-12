@@ -99,7 +99,7 @@ fun UserSecretListContent(
                     Text(
                         if (state.searchQuery.isBlank()) {
                             "${state.secrets.size} secret${if (state.secrets.size != 1) "s" else ""}" +
-                                (state.lastLoadDurationMs?.let { " · loaded in ${formatLoadDuration(it)}" } ?: "")
+                                (state.lastLoadDurationMs?.let { " · last fetch ${formatLoadDuration(it)}" } ?: "")
                         } else {
                             "${state.secrets.size} result${if (state.secrets.size != 1) "s" else ""} for '${state.searchQuery}'"
                         },

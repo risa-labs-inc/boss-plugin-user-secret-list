@@ -53,7 +53,7 @@ class UserSecretListViewModel(
      * diagnosable from the host console (search for "UserSecretList").
      */
     private fun logTiming(operation: String, elapsedMs: Long, outcome: String, failed: Boolean = false) {
-        val message = "$operation: $outcome in $elapsedMs ms"
+        val message = "$operation: ${if (failed) "FAILED ($outcome)" else outcome} in $elapsedMs ms"
         if (failed) {
             logger.warn(LogCategory.NETWORK, message)
         } else {
@@ -109,7 +109,7 @@ class UserSecretListViewModel(
                 if (exception is CancellationException) return@onFailure
 
                 val error = exception.message ?: "Unknown error"
-                logTiming("getUserSecretsWithSharingInfo", elapsedMs, "FAILED: $error", failed = true)
+                logTiming("getUserSecretsWithSharingInfo", elapsedMs, error, failed = true)
                 _state.update { it.copy(
                     isLoading = false,
                     errorMessage = error
