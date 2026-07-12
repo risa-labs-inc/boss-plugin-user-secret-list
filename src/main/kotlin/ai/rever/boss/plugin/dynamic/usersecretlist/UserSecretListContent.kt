@@ -1,6 +1,5 @@
 package ai.rever.boss.plugin.dynamic.usersecretlist
 
-import ai.rever.boss.plugin.api.SecretDataProvider
 import ai.rever.boss.plugin.api.SecretEntryWithSharingData
 import ai.rever.boss.plugin.scrollbar.getPanelScrollbarConfig
 import ai.rever.boss.plugin.scrollbar.lazyListScrollbar
@@ -30,15 +29,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * The ViewModel is owned by [UserSecretListComponent] so state survives the
+ * panel leaving and re-entering composition.
+ */
 @Composable
-fun UserSecretListContent(
-    secretDataProvider: SecretDataProvider?,
-    scope: CoroutineScope
-) {
-    val viewModel = remember { UserSecretListViewModel(secretDataProvider, scope) }
+fun UserSecretListContent(viewModel: UserSecretListViewModel) {
     val state by viewModel.state.collectAsState()
 
     BossTheme {
@@ -97,7 +96,8 @@ fun UserSecretListContent(
                     // Secret count
                     Text(
                         if (state.searchQuery.isBlank()) {
-                            "${state.secrets.size} secret${if (state.secrets.size != 1) "s" else ""}"
+                            "${state.secrets.size} secret${if (state.secrets.size != 1) "s" else ""}" +
+                                (state.lastLoadDurationMs?.let { " · last fetch ${formatLoadDuration(it)}" } ?: "")
                         } else {
                             "${state.secrets.size} result${if (state.secrets.size != 1) "s" else ""} for '${state.searchQuery}'"
                         },
@@ -627,11 +627,24 @@ private fun UserSecretCard(
     }
 }
 
+private fun formatLoadDuration(ms: Long): String = when {
+    ms < 1000 -> "${ms}ms"
+    ms < 60_000 -> "${ms / 1000}.${(ms % 1000) / 100}s"
+    else -> "${ms / 60_000}m ${(ms % 60_000) / 1000}s"
+}
+
 /**
  * Loading view
  */
 @Composable
 private fun UserSecretLoadingView() {
+    var elapsedSeconds by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            elapsedSeconds++
+        }
+    }
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -642,10 +655,17 @@ private fun UserSecretLoadingView() {
         ) {
             CircularProgressIndicator(color = BossThemeColors.SuccessColor)
             Text(
-                "Loading your secrets...",
+                if (elapsedSeconds < 3) "Loading your secrets..." else "Loading your secrets... ${elapsedSeconds}s",
                 color = BossThemeColors.TextSecondary,
                 fontSize = 14.sp
             )
+            if (elapsedSeconds >= 10) {
+                Text(
+                    "Still waiting on the server — the network may be slow",
+                    color = BossThemeColors.TextSecondary.copy(alpha = 0.6f),
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 }

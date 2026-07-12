@@ -2,6 +2,8 @@ package ai.rever.boss.plugin.dynamic.usersecretlist
 
 import ai.rever.boss.plugin.api.SecretDataProvider
 import ai.rever.boss.plugin.api.SecretEntryWithSharingData
+import ai.rever.boss.plugin.logging.BossLogger
+import ai.rever.boss.plugin.logging.LogCategory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -26,6 +28,8 @@ class UserSecretListViewModel(
     private val secretDataProvider: SecretDataProvider?,
     private val scope: CoroutineScope
 ) {
+    private val logger = BossLogger.forComponent("UserSecretList")
+
     private val _state = MutableStateFlow(UserSecretListState())
     val state: StateFlow<UserSecretListState> = _state.asStateFlow()
 
@@ -35,6 +39,26 @@ class UserSecretListViewModel(
 
     init {
         loadSecrets()
+    }
+
+    /**
+     * Elapsed milliseconds since a System.nanoTime() mark — monotonic, so
+     * durations are immune to wall-clock (NTP) jumps.
+     */
+    private fun elapsedMsSince(startedAtNanos: Long): Long =
+        (System.nanoTime() - startedAtNanos) / 1_000_000
+
+    /**
+     * Log elapsed time for a data operation so intermittent slow loads are
+     * diagnosable from the host console (search for "UserSecretList").
+     */
+    private fun logTiming(operation: String, elapsedMs: Long, outcome: String, failed: Boolean = false) {
+        val message = "$operation: ${if (failed) "FAILED ($outcome)" else outcome} in $elapsedMs ms"
+        if (failed) {
+            logger.warn(LogCategory.NETWORK, message)
+        } else {
+            logger.info(LogCategory.NETWORK, message)
+        }
     }
 
     /**
@@ -58,28 +82,34 @@ class UserSecretListViewModel(
             errorMessage = null,
             searchQuery = "",
             currentOffset = 0,
-            hasMore = true
+            hasMore = true,
+            lastLoadDurationMs = null
         ) }
 
         loadJob = scope.launch {
+            val startedAt = System.nanoTime()
             val result = provider.getUserSecretsWithSharingInfo(
                 limit = _state.value.pageSize,
                 offset = 0
             )
+            val elapsedMs = elapsedMsSince(startedAt)
 
             result.onSuccess { paginatedResult ->
                 val secrets = paginatedResult.data
+                logTiming("getUserSecretsWithSharingInfo", elapsedMs, "${secrets.size} secrets")
                 _state.update { it.copy(
                     allSecrets = secrets,
                     secrets = secrets,
                     isLoading = false,
                     currentOffset = secrets.size,
-                    hasMore = paginatedResult.hasMore
+                    hasMore = paginatedResult.hasMore,
+                    lastLoadDurationMs = elapsedMs
                 ) }
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure
 
                 val error = exception.message ?: "Unknown error"
+                logTiming("getUserSecretsWithSharingInfo", elapsedMs, error, failed = true)
                 _state.update { it.copy(
                     isLoading = false,
                     errorMessage = error
@@ -103,27 +133,33 @@ class UserSecretListViewModel(
         _state.update { it.copy(isLoadingMore = true) }
 
         loadMoreJob = scope.launch {
+            val startedAt = System.nanoTime()
             val result = provider.getUserSecretsWithSharingInfo(
                 limit = currentState.pageSize,
                 offset = currentState.currentOffset
             )
+            val elapsedMs = elapsedMsSince(startedAt)
 
             result.onSuccess { paginatedResult ->
                 val newSecrets = paginatedResult.data
+                logTiming("getUserSecretsWithSharingInfo(offset=${currentState.currentOffset})", elapsedMs, "${newSecrets.size} secrets")
                 val allSecrets = _state.value.allSecrets + newSecrets
                 _state.update { it.copy(
                     allSecrets = allSecrets,
                     secrets = if (it.searchQuery.isBlank()) allSecrets else it.secrets,
                     isLoadingMore = false,
                     currentOffset = it.currentOffset + newSecrets.size,
-                    hasMore = paginatedResult.hasMore
+                    hasMore = paginatedResult.hasMore,
+                    lastLoadDurationMs = elapsedMs
                 ) }
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure
 
+                val error = exception.message ?: "Unknown error"
+                logTiming("getUserSecretsWithSharingInfo(offset=${currentState.currentOffset})", elapsedMs, error, failed = true)
                 _state.update { it.copy(
                     isLoadingMore = false,
-                    errorMessage = exception.message ?: "Unknown error"
+                    errorMessage = error
                 ) }
             }
         }
@@ -186,5 +222,6 @@ data class UserSecretListState(
     val expandedSecretIds: Set<String> = emptySet(),
     val pageSize: Int = 50,
     val currentOffset: Int = 0,
-    val hasMore: Boolean = true
+    val hasMore: Boolean = true,
+    val lastLoadDurationMs: Long? = null
 )
