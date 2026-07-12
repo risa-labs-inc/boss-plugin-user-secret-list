@@ -1,6 +1,5 @@
 package ai.rever.boss.plugin.dynamic.usersecretlist
 
-import ai.rever.boss.plugin.api.SecretDataProvider
 import ai.rever.boss.plugin.api.SecretEntryWithSharingData
 import ai.rever.boss.plugin.scrollbar.getPanelScrollbarConfig
 import ai.rever.boss.plugin.scrollbar.lazyListScrollbar
@@ -30,16 +29,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * The ViewModel is owned by [UserSecretListComponent] so state survives the
+ * panel leaving and re-entering composition.
+ */
 @Composable
-fun UserSecretListContent(
-    secretDataProvider: SecretDataProvider?,
-    scope: CoroutineScope
-) {
-    val viewModel = remember { UserSecretListViewModel(secretDataProvider, scope) }
+fun UserSecretListContent(viewModel: UserSecretListViewModel) {
     val state by viewModel.state.collectAsState()
 
     BossTheme {
