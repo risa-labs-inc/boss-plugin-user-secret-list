@@ -38,6 +38,14 @@ class UserSecretListViewModel(
     }
 
     /**
+     * Log elapsed time for a data operation so intermittent slow loads are
+     * diagnosable from the host console (search for "UserSecretList").
+     */
+    private fun logTiming(operation: String, startedAtMs: Long, outcome: String) {
+        println("[UserSecretList] $operation: $outcome in ${System.currentTimeMillis() - startedAtMs} ms")
+    }
+
+    /**
      * Load all accessible secrets (owned + shared)
      */
     fun loadSecrets() {
@@ -62,6 +70,7 @@ class UserSecretListViewModel(
         ) }
 
         loadJob = scope.launch {
+            val startedAt = System.currentTimeMillis()
             val result = provider.getUserSecretsWithSharingInfo(
                 limit = _state.value.pageSize,
                 offset = 0
@@ -69,17 +78,20 @@ class UserSecretListViewModel(
 
             result.onSuccess { paginatedResult ->
                 val secrets = paginatedResult.data
+                logTiming("getUserSecretsWithSharingInfo", startedAt, "${secrets.size} secrets")
                 _state.update { it.copy(
                     allSecrets = secrets,
                     secrets = secrets,
                     isLoading = false,
                     currentOffset = secrets.size,
-                    hasMore = paginatedResult.hasMore
+                    hasMore = paginatedResult.hasMore,
+                    lastLoadDurationMs = System.currentTimeMillis() - startedAt
                 ) }
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure
 
                 val error = exception.message ?: "Unknown error"
+                logTiming("getUserSecretsWithSharingInfo", startedAt, "FAILED: $error")
                 _state.update { it.copy(
                     isLoading = false,
                     errorMessage = error
@@ -103,6 +115,7 @@ class UserSecretListViewModel(
         _state.update { it.copy(isLoadingMore = true) }
 
         loadMoreJob = scope.launch {
+            val startedAt = System.currentTimeMillis()
             val result = provider.getUserSecretsWithSharingInfo(
                 limit = currentState.pageSize,
                 offset = currentState.currentOffset
@@ -110,6 +123,7 @@ class UserSecretListViewModel(
 
             result.onSuccess { paginatedResult ->
                 val newSecrets = paginatedResult.data
+                logTiming("getUserSecretsWithSharingInfo(offset=${currentState.currentOffset})", startedAt, "${newSecrets.size} secrets")
                 val allSecrets = _state.value.allSecrets + newSecrets
                 _state.update { it.copy(
                     allSecrets = allSecrets,
@@ -186,5 +200,6 @@ data class UserSecretListState(
     val expandedSecretIds: Set<String> = emptySet(),
     val pageSize: Int = 50,
     val currentOffset: Int = 0,
-    val hasMore: Boolean = true
+    val hasMore: Boolean = true,
+    val lastLoadDurationMs: Long? = null
 )
