@@ -42,11 +42,18 @@ class UserSecretListViewModel(
     private val logger = BossLogger.forComponent("UserSecretList")
 
     /**
+     * Elapsed milliseconds since a System.nanoTime() mark — monotonic, so
+     * durations are immune to wall-clock (NTP) jumps.
+     */
+    private fun elapsedMsSince(startedAtNanos: Long): Long =
+        (System.nanoTime() - startedAtNanos) / 1_000_000
+
+    /**
      * Log elapsed time for a data operation so intermittent slow loads are
      * diagnosable from the host console (search for "UserSecretList").
      */
-    private fun logTiming(operation: String, startedAtMs: Long, outcome: String, failed: Boolean = false) {
-        val message = "$operation: $outcome in ${System.currentTimeMillis() - startedAtMs} ms"
+    private fun logTiming(operation: String, elapsedMs: Long, outcome: String, failed: Boolean = false) {
+        val message = "$operation: $outcome in $elapsedMs ms"
         if (failed) {
             logger.warn(LogCategory.NETWORK, message)
         } else {
@@ -75,32 +82,34 @@ class UserSecretListViewModel(
             errorMessage = null,
             searchQuery = "",
             currentOffset = 0,
-            hasMore = true
+            hasMore = true,
+            lastLoadDurationMs = null
         ) }
 
         loadJob = scope.launch {
-            val startedAt = System.currentTimeMillis()
+            val startedAt = System.nanoTime()
             val result = provider.getUserSecretsWithSharingInfo(
                 limit = _state.value.pageSize,
                 offset = 0
             )
+            val elapsedMs = elapsedMsSince(startedAt)
 
             result.onSuccess { paginatedResult ->
                 val secrets = paginatedResult.data
-                logTiming("getUserSecretsWithSharingInfo", startedAt, "${secrets.size} secrets")
+                logTiming("getUserSecretsWithSharingInfo", elapsedMs, "${secrets.size} secrets")
                 _state.update { it.copy(
                     allSecrets = secrets,
                     secrets = secrets,
                     isLoading = false,
                     currentOffset = secrets.size,
                     hasMore = paginatedResult.hasMore,
-                    lastLoadDurationMs = System.currentTimeMillis() - startedAt
+                    lastLoadDurationMs = elapsedMs
                 ) }
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure
 
                 val error = exception.message ?: "Unknown error"
-                logTiming("getUserSecretsWithSharingInfo", startedAt, "FAILED: $error", failed = true)
+                logTiming("getUserSecretsWithSharingInfo", elapsedMs, "FAILED: $error", failed = true)
                 _state.update { it.copy(
                     isLoading = false,
                     errorMessage = error
@@ -124,15 +133,16 @@ class UserSecretListViewModel(
         _state.update { it.copy(isLoadingMore = true) }
 
         loadMoreJob = scope.launch {
-            val startedAt = System.currentTimeMillis()
+            val startedAt = System.nanoTime()
             val result = provider.getUserSecretsWithSharingInfo(
                 limit = currentState.pageSize,
                 offset = currentState.currentOffset
             )
+            val elapsedMs = elapsedMsSince(startedAt)
 
             result.onSuccess { paginatedResult ->
                 val newSecrets = paginatedResult.data
-                logTiming("getUserSecretsWithSharingInfo(offset=${currentState.currentOffset})", startedAt, "${newSecrets.size} secrets")
+                logTiming("getUserSecretsWithSharingInfo(offset=${currentState.currentOffset})", elapsedMs, "${newSecrets.size} secrets")
                 val allSecrets = _state.value.allSecrets + newSecrets
                 _state.update { it.copy(
                     allSecrets = allSecrets,
@@ -140,7 +150,7 @@ class UserSecretListViewModel(
                     isLoadingMore = false,
                     currentOffset = it.currentOffset + newSecrets.size,
                     hasMore = paginatedResult.hasMore,
-                    lastLoadDurationMs = System.currentTimeMillis() - startedAt
+                    lastLoadDurationMs = elapsedMs
                 ) }
             }.onFailure { exception ->
                 if (exception is CancellationException) return@onFailure
