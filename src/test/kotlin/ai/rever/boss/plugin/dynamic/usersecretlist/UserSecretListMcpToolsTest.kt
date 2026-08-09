@@ -63,6 +63,23 @@ class UserSecretListMcpToolsTest {
         assertContains(result.text, "Failed:", message = "a provider failure must not look like a miss")
     }
 
+    /**
+     * The path this plugin exists for. Every other case here builds an OWNED entry, but the
+     * refusal reads `tags` off the sharing DTO, so an owner-only suite would stay green if
+     * the shared projection ever dropped them.
+     *
+     * The server side is uniform - `get_user_secrets_with_shared` unions the five access
+     * sources carrying only ids, then joins back to `secrets` and computes tags once, so a
+     * shared row and an owned row get identical tags. This pins the plugin's half of that.
+     */
+    @Test
+    fun `an ai-provider key shared with me is refused too`() = runTest {
+        val result = getSecret("k3", tags = listOf("ai-provider"), isOwner = false, accessLevel = "read")
+
+        assertTrue(result.isError, "a shared provider key must be refused like an owned one")
+        assertFalse(result.text.contains(PROVIDER_KEY))
+    }
+
     @Test
     fun `my_secret_get still reveals an ordinary secret`() = runTest {
         val result = getSecret("k2", tags = listOf("api-key"))
@@ -97,13 +114,24 @@ class UserSecretListMcpToolsTest {
 
     // ---------------------------------------------------------------------
 
-    private suspend fun getSecret(id: String, tags: List<String>): McpToolResult {
-        val provider = UserSecretListMcpToolProvider("test", FakeSecrets(listOf(entry(id, tags))))
+    private suspend fun getSecret(
+        id: String,
+        tags: List<String>,
+        isOwner: Boolean = true,
+        accessLevel: String = "owner",
+    ): McpToolResult {
+        val provider =
+            UserSecretListMcpToolProvider("test", FakeSecrets(listOf(entry(id, tags, isOwner, accessLevel))))
         val tool = provider.tools().first { it.name == "my_secret_get" }
         return tool.handler.call(McpToolArgs(mapOf("id" to id)))
     }
 
-    private fun entry(id: String, tags: List<String>) = SecretEntryWithSharingData(
+    private fun entry(
+        id: String,
+        tags: List<String>,
+        isOwner: Boolean = true,
+        accessLevel: String = "owner",
+    ) = SecretEntryWithSharingData(
         id = id,
         website = "api.anthropic.com",
         username = "default",
@@ -112,8 +140,8 @@ class UserSecretListMcpToolsTest {
         tags = tags,
         createdAt = "2026-08-09T00:00:00Z",
         updatedAt = "2026-08-09T00:00:00Z",
-        isOwner = true,
-        accessLevel = "owner",
+        isOwner = isOwner,
+        accessLevel = accessLevel,
     )
 
     private companion object {

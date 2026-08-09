@@ -96,6 +96,13 @@ internal class UserSecretListMcpToolProvider(
          * imported: the two plugins are separate jars in separate classloaders with no
          * shared module, and the value is part of the on-record data, so it cannot drift
          * without also breaking Secret Manager's own reads.
+         *
+         * "Every stored credential" is literal, not aspirational - there is no untagged
+         * cohort to back-fill. The constant was introduced in the same commit that created
+         * `ProviderCredentialStore` (secret-manager `bb39d84`), and the legacy importer
+         * persists through that store's `saveKey`, so migrated keys are tagged too. An
+         * untagged secret holding an API key is an ordinary user-created entry that was
+         * never provider configuration, which this refusal has never claimed to cover.
          */
         const val TAG_AI_PROVIDER: String = "ai-provider"
 

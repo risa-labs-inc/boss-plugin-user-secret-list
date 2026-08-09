@@ -26,25 +26,16 @@ val useLocalDependencies = System.getenv("CI") != "true"
 val bossPluginApiPath = "../boss-plugin-api"
 
 /**
- * The most recently built api jar in the sibling checkout, whatever its version.
+ * Where a locally built api jar would be. Resolved to a plain [File] at configuration time
+ * so the provider below captures *it* rather than the script object.
  *
- * Local development only - CI uses the downloaded jar. Deliberately not a hardcoded file
- * name: that goes stale on every api release and surfaces as "Unresolved reference" on a
- * symbol that plainly exists. This file pinned 1.0.51, which no longer exists locally.
- * Newest-by-mtime rather than by version string, because 1.0.9 sorts above 1.0.71
- * lexicographically and the jar you just built is the one you meant.
- *
- * A function, not a top-level `val`: as a val the `listFiles()` ran at CONFIGURATION time,
- * so building the sibling jar after Gradle configured still got the stale pick until the
- * next invocation, and under the configuration cache it is an undeclared filesystem input
- * that a cache hit can miss entirely. Called from inside the provider below, so the lookup
- * is deferred along with the error.
+ * A top-level `fun` here would compile to a method on the script, so the lambda would close
+ * over `Project` - which the configuration cache cannot serialise. That is an error, not
+ * merely an undeclared input, and it would have been introduced by the very commit that
+ * cited the configuration cache as its motivation. Moot today (this repo does not enable
+ * CC) and cheap to keep correct.
  */
-fun locateLocalBossPluginApiJar(): File? =
-    file("$bossPluginApiPath/build/libs")
-        .listFiles { f: File -> f.name.startsWith("boss-plugin-api-") && f.name.endsWith(".jar") }
-        ?.filterNot { it.name.contains("-sources") || it.name.contains("-thin") }
-        ?.maxByOrNull { it.lastModified() }
+val bossPluginApiLibsDir: File = layout.projectDirectory.dir("$bossPluginApiPath/build/libs").asFile
 
 repositories {
     google()
@@ -68,8 +59,24 @@ repositories {
 val bossPluginApiJar: FileCollection =
     if (useLocalDependencies) {
         files(
-            provider {
-                locateLocalBossPluginApiJar()
+            providers.provider {
+                // Newest-by-mtime, not by version string: 1.0.9 sorts above 1.0.71
+                // lexicographically and the jar you just built is the one you meant. (The
+                // tradeoff is deliberate - checking out an older api tag and building it in
+                // the sibling silently makes that the compile target.)
+                //
+                // The classifier exclusions mirror CI's `--pattern 'boss-plugin-api-*[0-9].jar'`,
+                // which also filters -javadoc and -all. Without that, publishing either would
+                // let this pick a javadoc jar and produce a baffling "Unresolved reference".
+                bossPluginApiLibsDir
+                    .listFiles { f: File -> f.name.startsWith("boss-plugin-api-") && f.name.endsWith(".jar") }
+                    ?.filterNot {
+                        it.name.contains("-sources") ||
+                            it.name.contains("-thin") ||
+                            it.name.contains("-javadoc") ||
+                            it.name.contains("-all")
+                    }
+                    ?.maxByOrNull { it.lastModified() }
                     ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first.")
             },
         )
