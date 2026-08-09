@@ -50,14 +50,26 @@ internal class UserSecretListMcpToolProvider(
             handler = McpToolHandler { args ->
                 val id = args.string("id")
                     ?: return@McpToolHandler McpToolResult("Missing required argument: id", isError = true)
-                val entry = secrets.getUserSecretsWithSharingInfo(limit = 500).getOrNull()
-                    ?.data?.firstOrNull { it.id == id }
+                // Distinguished from a miss deliberately: getOrNull() collapsed a store
+                // failure into "No secret with id X", which reads as an answer rather than a
+                // failure. my_secrets_list already folds; this now matches it.
+                val page = secrets.getUserSecretsWithSharingInfo(limit = LOOKUP_LIMIT).getOrElse {
+                    return@McpToolHandler McpToolResult("Failed: ${it.message}", isError = true)
+                }
+                // TODO: LOOKUP_LIMIT is a single page. A user with more than that many
+                // secrets gets "No secret with id X" for everything past it. Pre-existing;
+                // needs a by-id lookup on SecretDataProvider rather than a bigger number.
+                val entry = page.data.firstOrNull { it.id == id }
                     ?: return@McpToolHandler McpToolResult("No secret with id $id", isError = true)
                 // my_secrets_list hands out ids and this hands out the plaintext password,
                 // so without the gate a prompt-injected agent is two tool calls from every
                 // configured provider key. An agent that needs to *use* a provider goes
                 // through PluginContext.llmProvider and never needs the raw value.
-                if (entry.tags.contains(TAG_AI_PROVIDER)) {
+                // Normalised rather than an exact `contains`: a stored "AI-Provider" or a
+                // trailing space from a hand-edited tag would otherwise fail OPEN, returning
+                // the key with nothing to signal it. Failing closed on a near-miss costs an
+                // unnecessary refusal; failing open costs the credential.
+                if (entry.tags.any { it.trim().equals(TAG_AI_PROVIDER, ignoreCase = true) }) {
                     return@McpToolHandler McpToolResult(
                         "Secret $id is an AI provider key and is not readable through this tool. " +
                             "Use the provider via Settings > AI Providers instead.",
@@ -86,6 +98,9 @@ internal class UserSecretListMcpToolProvider(
          * without also breaking Secret Manager's own reads.
          */
         const val TAG_AI_PROVIDER: String = "ai-provider"
+
+        /** One page. See the TODO at the lookup site. */
+        const val LOOKUP_LIMIT: Int = 500
 
         const val LIMIT_SCHEMA =
             """{"type":"object","properties":{"limit":{"type":"integer","description":"Max secrets (default 100)."}}}"""

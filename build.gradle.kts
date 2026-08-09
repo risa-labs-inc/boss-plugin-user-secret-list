@@ -47,22 +47,33 @@ repositories {
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 }
 
-dependencies {
+/**
+ * The api jar, resolved lazily.
+ *
+ * `files(provider { ... })` rather than `files(jar ?: error(...))`: the latter runs at
+ * CONFIGURATION time, so a checkout without a built sibling api could no longer run
+ * `./gradlew tasks`, `./gradlew clean`, or complete an IDE sync - a better message bought
+ * at the cost of a much wider blast radius. Deferred, the error surfaces only when a task
+ * actually needs the jar.
+ *
+ * NOTE: plugin.json declares apiVersion 1.0.20 - the ai.rever.boss.plugin.logging and
+ * .scrollbar packages used by this plugin were introduced in exactly that release (api tag
+ * v1.0.20), so the declared minimum is accurate.
+ */
+val bossPluginApiJar: FileCollection =
     if (useLocalDependencies) {
-        // Local development: use boss-plugin-api JAR from sibling repo.
-        // NOTE: plugin.json declares apiVersion 1.0.20 — the ai.rever.boss.plugin.logging
-        // and .scrollbar packages used by this plugin were introduced in exactly that
-        // release (api tag v1.0.20), so the declared minimum is accurate.
-        compileOnly(
-            files(
+        files(
+            provider {
                 localBossPluginApiJar
-                    ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first."),
-            ),
+                    ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first.")
+            },
         )
     } else {
-        // CI: use downloaded JAR
-        compileOnly(files("build/downloaded-deps/boss-plugin-api.jar"))
+        files("build/downloaded-deps/boss-plugin-api.jar")
     }
+
+dependencies {
+    compileOnly(bossPluginApiJar)
 
     // Compose dependencies
     implementation(compose.desktop.currentOs)
@@ -93,16 +104,7 @@ dependencies {
     testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
     // The api is compileOnly (the host supplies it at runtime), so it is absent from the
     // test runtime by default. Tests need it on the classpath explicitly.
-    if (useLocalDependencies) {
-        testImplementation(
-            files(
-                localBossPluginApiJar
-                    ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first."),
-            ),
-        )
-    } else {
-        testImplementation(files("build/downloaded-deps/boss-plugin-api.jar"))
-    }
+    testImplementation(bossPluginApiJar)
 }
 
 tasks.withType<Test>().configureEach {

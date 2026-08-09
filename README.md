@@ -30,7 +30,8 @@ panel by design - use Secret Manager for those.
 Both are gated on the `secret.read` permission.
 
 **`my_secret_get` refuses any secret tagged `ai-provider`**, matching Secret Manager's
-`secret_get`. Both plugins read the same store under the same gate, so a refusal in only one
+`secret_get`. The tag is compared case-insensitively and trimmed, because an exact match
+fails *open* on a hand-edited tag and nothing would signal it. Both plugins read the same store under the same gate, so a refusal in only one
 of them is not a refusal - the agent would just call the other tool. An agent that needs to
 *use* a provider goes through `PluginContext.llmProvider` and never needs the raw value.
 

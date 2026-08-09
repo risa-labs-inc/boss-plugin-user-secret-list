@@ -38,6 +38,31 @@ class UserSecretListMcpToolsTest {
         )
     }
 
+    /**
+     * The comparison, not just the constant. An exact `contains` fails OPEN on a stored
+     * "AI-Provider" or a trailing space from a hand-edited tag, and nothing signals it.
+     */
+    @Test
+    fun `a differently-cased or padded tag is still refused`() = runTest {
+        for (tag in listOf("AI-Provider", "ai-provider ", " Ai-Provider")) {
+            val result = getSecret("k$tag", tags = listOf(tag))
+            assertTrue(result.isError, "tag <$tag> must still be refused")
+            assertFalse(result.text.contains(PROVIDER_KEY), "leaked the key for tag <$tag>")
+        }
+    }
+
+    /** A store failure must not read as "there is no such secret". */
+    @Test
+    fun `a store failure is reported as a failure`() = runTest {
+        val provider = UserSecretListMcpToolProvider("test", FailingSecrets())
+        val tool = provider.tools().first { it.name == "my_secret_get" }
+
+        val result = tool.handler.call(McpToolArgs(mapOf("id" to "k1")))
+
+        assertTrue(result.isError)
+        assertContains(result.text, "Failed:", message = "a provider failure must not look like a miss")
+    }
+
     @Test
     fun `my_secret_get still reveals an ordinary secret`() = runTest {
         val result = getSecret("k2", tags = listOf("api-key"))
@@ -88,6 +113,14 @@ class UserSecretListMcpToolsTest {
 
     private companion object {
         const val PROVIDER_KEY = "sk-ant-test-not-a-real-key"
+    }
+
+    /** Fails the one read `my_secret_get` performs. */
+    private class FailingSecrets : SecretDataProvider by FakeSecrets(emptyList()) {
+        override suspend fun getUserSecretsWithSharingInfo(
+            limit: Int,
+            offset: Int,
+        ): Result<PaginatedSecretsWithSharingData> = Result.failure(IllegalStateException("not signed in"))
     }
 
     /** Only [getUserSecretsWithSharingInfo] is exercised; the rest of the interface is unused here. */
