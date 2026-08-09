@@ -1,8 +1,13 @@
 name: Tests
 
 # This plugin had no tests at all until the `my_secret_get` AI-provider refusal landed, and
-# the release workflow does not run them - so without this job the suite would never gate
-# anything. Mirrors secret-manager's test.yml, plus the push/concurrency/permissions below.
+# the release workflow does not run them. Mirrors secret-manager's test.yml, plus the
+# push/concurrency/permissions below.
+#
+# What this actually does, so nobody over-reads it: it GATES on pull_request (and only if
+# `test` is a required status check in branch protection), and REPORTS on main. build.yml
+# triggers on the same push and publishes to the store independently, so a red run here
+# does not stop a release - it is post-hoc signal, which still beats none.
 on:
   pull_request:
   # Also on main: a direct push, or a merge commit whose tree differs from the PR head
@@ -13,9 +18,14 @@ on:
   workflow_dispatch:
 
 # A superseded PR push should cancel its predecessor rather than queue behind it.
+#
+# Scoped to pull_request deliberately. On main every push shares one ref, so a blanket
+# cancel-in-progress would let two merges in quick succession cancel the first - leaving
+# that merge commit's tree untested, which is the exact case the push trigger above exists
+# to cover, failing precisely when the repo is busiest.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
