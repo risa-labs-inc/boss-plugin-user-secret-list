@@ -25,6 +25,22 @@ kotlin {
 val useLocalDependencies = System.getenv("CI") != "true"
 val bossPluginApiPath = "../boss-plugin-api"
 
+/**
+ * The most recently built api jar in the sibling checkout, whatever its version.
+ *
+ * Local development only - CI uses the downloaded jar. Deliberately not a hardcoded file
+ * name: that goes stale on every api release and surfaces as "Unresolved reference" on a
+ * symbol that plainly exists. This file pinned 1.0.51, which no longer exists locally.
+ * Newest-by-mtime rather than by version string, because 1.0.9 sorts above 1.0.71
+ * lexicographically and the jar you just built is the one you meant. Same block as
+ * secret-manager's, which this plugin shadows in every other respect.
+ */
+val localBossPluginApiJar: File? =
+    file("$bossPluginApiPath/build/libs")
+        .listFiles { f: File -> f.name.startsWith("boss-plugin-api-") && f.name.endsWith(".jar") }
+        ?.filterNot { it.name.contains("-sources") || it.name.contains("-thin") }
+        ?.maxByOrNull { it.lastModified() }
+
 repositories {
     google()
     mavenCentral()
@@ -37,12 +53,17 @@ dependencies {
         // NOTE: plugin.json declares apiVersion 1.0.20 — the ai.rever.boss.plugin.logging
         // and .scrollbar packages used by this plugin were introduced in exactly that
         // release (api tag v1.0.20), so the declared minimum is accurate.
-        compileOnly(files("$bossPluginApiPath/build/libs/boss-plugin-api-1.0.51.jar"))
+        compileOnly(
+            files(
+                localBossPluginApiJar
+                    ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first."),
+            ),
+        )
     } else {
         // CI: use downloaded JAR
         compileOnly(files("build/downloaded-deps/boss-plugin-api.jar"))
     }
-    
+
     // Compose dependencies
     implementation(compose.desktop.currentOs)
     implementation(compose.runtime)
@@ -60,6 +81,32 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+
+    // Tests. This plugin had none, which is how `my_secret_get` shipped without the
+    // AI-provider refusal its sibling tool carries. These run without a host or a
+    // live credential.
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    // BossLogger binds slf4j at class-init, so a backend is required or every class
+    // holding a logger fails with NoClassDefFoundError in tests. The host provides one
+    // at runtime; tests have to supply their own.
+    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
+    // The api is compileOnly (the host supplies it at runtime), so it is absent from the
+    // test runtime by default. Tests need it on the classpath explicitly.
+    if (useLocalDependencies) {
+        testImplementation(
+            files(
+                localBossPluginApiJar
+                    ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first."),
+            ),
+        )
+    } else {
+        testImplementation(files("build/downloaded-deps/boss-plugin-api.jar"))
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
 
 // Task to build plugin JAR with compiled classes only
