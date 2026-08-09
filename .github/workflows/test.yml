@@ -1,15 +1,28 @@
 name: Tests
 
 # This plugin had no tests at all until the `my_secret_get` AI-provider refusal landed, and
-# the release workflow only runs on pushes to main - so without this job the suite would
-# never run on the one event where it matters. Mirrors secret-manager's test.yml.
+# the release workflow does not run them - so without this job the suite would never gate
+# anything. Mirrors secret-manager's test.yml, plus the push/concurrency/permissions below.
 on:
   pull_request:
+  # Also on main: a direct push, or a merge commit whose tree differs from the PR head
+  # that was tested, would otherwise ship without the suite ever running. The release
+  # workflow does not run it.
+  push:
+    branches: [main]
   workflow_dispatch:
+
+# A superseded PR push should cancel its predecessor rather than queue behind it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Only the api jar download and the checkout need anything; both are reads.
+    permissions:
+      contents: read
     env:
       # Selects the downloaded-jar branch in build.gradle.kts rather than the sibling
       # checkout, which only exists on a developer machine.
