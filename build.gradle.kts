@@ -32,10 +32,15 @@ val bossPluginApiPath = "../boss-plugin-api"
  * name: that goes stale on every api release and surfaces as "Unresolved reference" on a
  * symbol that plainly exists. This file pinned 1.0.51, which no longer exists locally.
  * Newest-by-mtime rather than by version string, because 1.0.9 sorts above 1.0.71
- * lexicographically and the jar you just built is the one you meant. Same block as
- * secret-manager's, which this plugin shadows in every other respect.
+ * lexicographically and the jar you just built is the one you meant.
+ *
+ * A function, not a top-level `val`: as a val the `listFiles()` ran at CONFIGURATION time,
+ * so building the sibling jar after Gradle configured still got the stale pick until the
+ * next invocation, and under the configuration cache it is an undeclared filesystem input
+ * that a cache hit can miss entirely. Called from inside the provider below, so the lookup
+ * is deferred along with the error.
  */
-val localBossPluginApiJar: File? =
+fun locateLocalBossPluginApiJar(): File? =
     file("$bossPluginApiPath/build/libs")
         .listFiles { f: File -> f.name.startsWith("boss-plugin-api-") && f.name.endsWith(".jar") }
         ?.filterNot { it.name.contains("-sources") || it.name.contains("-thin") }
@@ -53,8 +58,8 @@ repositories {
  * `files(provider { ... })` rather than `files(jar ?: error(...))`: the latter runs at
  * CONFIGURATION time, so a checkout without a built sibling api could no longer run
  * `./gradlew tasks`, `./gradlew clean`, or complete an IDE sync - a better message bought
- * at the cost of a much wider blast radius. Deferred, the error surfaces only when a task
- * actually needs the jar.
+ * at the cost of a much wider blast radius. Both the lookup and the error are deferred, so
+ * this resolves when a task actually needs the jar rather than when Gradle configures.
  *
  * NOTE: plugin.json declares apiVersion 1.0.20 - the ai.rever.boss.plugin.logging and
  * .scrollbar packages used by this plugin were introduced in exactly that release (api tag
@@ -64,7 +69,7 @@ val bossPluginApiJar: FileCollection =
     if (useLocalDependencies) {
         files(
             provider {
-                localBossPluginApiJar
+                locateLocalBossPluginApiJar()
                     ?: error("No boss-plugin-api jar in $bossPluginApiPath/build/libs; build it there first.")
             },
         )

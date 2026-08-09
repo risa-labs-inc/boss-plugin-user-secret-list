@@ -72,11 +72,16 @@ class UserSecretListMcpToolsTest {
     }
 
     /**
-     * Pins the refusal to the tag Secret Manager actually writes. A drift here is silent:
-     * the tool would keep returning success and simply stop withholding anything.
+     * Pins the literal against a careless local edit, and nothing more.
+     *
+     * It deliberately does NOT promise the cross-repo guarantee its old name implied: no
+     * code here reads `ProviderCredentialStore.TAG_AI_PROVIDER`, so this cannot catch drift
+     * on Secret Manager's side. The value is part of the on-record data, so it cannot move
+     * without breaking that plugin's own reads either - but the durable fix is hoisting the
+     * constant onto `boss-plugin-api` so both plugins import one definition.
      */
     @Test
-    fun `the refused tag is the one secret-manager writes`() {
+    fun `the refused tag literal has not been edited`() {
         assertEquals("ai-provider", UserSecretListMcpToolProvider.TAG_AI_PROVIDER)
     }
 
