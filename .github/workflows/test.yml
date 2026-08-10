@@ -1,0 +1,82 @@
+name: Tests
+
+# This plugin had no tests at all until the `my_secret_get` AI-provider refusal landed, and
+# the release workflow does not run them. Mirrors secret-manager's test.yml, plus the
+# push/concurrency/permissions below.
+#
+# What this actually does, so nobody over-reads it: it GATES on pull_request (and only if
+# `test` is a required status check in branch protection), and REPORTS on main. build.yml
+# triggers on the same push and publishes to the store independently, so a red run here
+# does not stop a release - it is post-hoc signal, which still beats none.
+on:
+  pull_request:
+  # Also on main: a direct push, or a merge commit whose tree differs from the PR head
+  # that was tested, would otherwise ship without the suite ever running. The release
+  # workflow does not run it.
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A superseded PR push should cancel its predecessor rather than queue behind it.
+#
+# Scoped to pull_request deliberately. On main every push shares one ref, so a blanket
+# cancel-in-progress would let two merges in quick succession cancel the first - leaving
+# that merge commit's tree untested, which is the exact case the push trigger above exists
+# to cover, failing precisely when the repo is busiest.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Only the api jar download and the checkout need anything; both are reads.
+    permissions:
+      contents: read
+    env:
+      # Selects the downloaded-jar branch in build.gradle.kts rather than the sibling
+      # checkout, which only exists on a developer machine.
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Fetch the latest plugin api jar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Latest, matching boss_plugin_api_version in build.yml — so this job compiles
+          # against the same api the release job will. The api is additive-only, so latest
+          # always carries the symbols this code needs.
+          mkdir -p build/downloaded-deps
+          # Excludes sources/thin classifiers explicitly: --output takes a single file, so a
+          # release that ever ships a second matching asset would fail the job. build.gradle.kts
+          # filters the same two for the same reason.
+          gh release download \
+            --repo risa-labs-inc/boss-plugin-api \
+            --pattern 'boss-plugin-api-*[0-9].jar' \
+            --output build/downloaded-deps/boss-plugin-api.jar
+          test -s build/downloaded-deps/boss-plugin-api.jar
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+      # Unlike secret-manager, this plugin's buildPluginJar carries no packaged-bytecode
+      # guards. It runs here anyway so packaging failures (version sync, resource assembly)
+      # surface as a red PR rather than a red release on push to main.
+      - name: Build the plugin jar
+        run: ./gradlew buildPluginJar --no-daemon
+
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test
