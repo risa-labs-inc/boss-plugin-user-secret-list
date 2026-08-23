@@ -48,6 +48,30 @@ The host removes this plugin on startup once Secret Manager is installed at or a
 that has the sections (BossConsole `RetiredPlugins`). The notice covers older hosts, which have
 no such pass.
 
+### The notice's button
+
+`SecretManagerLink` holds the whole feature, and everything newer than the 1.0.20 floor is
+confined to it. `movedNoticeAction` is the decision, as a pure function, because it is the one
+thing here worth testing and the plugin itself cannot be instantiated in a test.
+
+Three things that are easy to get wrong, all pinned:
+
+- **"Installed" is not `isPluginLoaded`.** `DynamicPluginManager.disablePlugin` flips the state
+  to DISABLED and never calls `pluginLoader.unloadPlugin`, so a plugin the user switched off is
+  still in `getLoadedPlugins()` - and its panel is not registered, so Open would be a button that
+  does nothing. The check requires `isEnabled`, `healthy` and `!isIncompatible`.
+- **The capability probe is reflective, not a trial call.** `openPanel` arrived in api 1.0.57 and
+  the floor is 1.0.20, so its absence has to be detected rather than discovered under a press.
+  Calling it to find out reveals a panel, and the answer is needed at registration - so the probe
+  would pop the notice open by itself. It asks the host's *implementation* class for the method,
+  because the api's default no-op body means the interface always has it.
+- **There is no install call, and the button says so.** No plugin-facing api installs another
+  plugin. "Install" opens the Toolbox, with a supporting line saying that is what it does.
+
+The `methodNamesOf` seam exists because the probe is otherwise untestable: `openPanel` has a
+default body, and Kotlin synthesises an override into every implementing class, so a hand-written
+fake that does *not* override it still reports the method and the "old host" case is unreachable.
+
 `stateHolderClass` is gone from the manifest. It named *secret-manager's* host-side state holder
 for a panel that holds no state; only `PluginProcessMain` reads it, under `BOSS_MODE=KERNEL`,
 guarded by `isNotEmpty()` inside a try/catch - so both its absence and a missing class were

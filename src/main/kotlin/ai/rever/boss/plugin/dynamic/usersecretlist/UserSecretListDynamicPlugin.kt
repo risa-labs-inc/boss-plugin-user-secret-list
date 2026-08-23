@@ -38,10 +38,14 @@ class UserSecretListDynamicPlugin : DynamicPlugin {
     override val url: String = "https://github.com/risa-labs-inc/boss-plugin-user-secret-list"
 
     override fun register(context: PluginContext) {
+        // Read once here rather than per panel construction: the providers do not change for the
+        // life of the plugin, and the reflective capability probe should not run per composition.
+        val link = SecretManagerLink.from(context)
+
         // The panel id and icon are unchanged, so a saved sidebar layout still resolves it and
         // the user finds the notice where the list used to be.
         context.panelRegistry.registerPanel(UserSecretListInfo) { ctx, panelInfo ->
-            UserSecretListComponent(ctx, panelInfo)
+            UserSecretListComponent(ctx, panelInfo, link)
         }
     }
 }

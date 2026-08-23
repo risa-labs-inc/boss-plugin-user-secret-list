@@ -24,7 +24,32 @@ though every AI provider setting lives in Secret Manager.
 
 ## What this version still does
 
-One panel, in the same slot with the same icon, saying where the list went. That is all:
+One panel, in the same slot with the same icon, saying where the list went - with one button on it:
+
+| Secret Manager | The notice offers |
+|---|---|
+| installed and enabled | **Open Secret Manager** |
+| absent, disabled, unhealthy or incompatible | **Install Secret Manager**, which opens the Toolbox |
+| either, on a host older than api 1.0.57 | no button - text saying where to look |
+
+The button says what it does. **No plugin-facing api installs another plugin** (the host's own
+installer is what resolves a store row to a jar, which is why the Toolbox has a deep-link handler
+for web pages), so "Install" opens the Toolbox rather than implying a one-press install this
+cannot perform.
+
+"Installed" is read from `getLoadedPlugins()` and requires `isEnabled`, `healthy` and
+`!isIncompatible` - not `isPluginLoaded`, which was the first version and is wrong in a way that
+shows: `disablePlugin` flips the state without unloading, so a plugin the user switched off is
+still "loaded" while its panel is not registered. Offering Open there is a button that does
+nothing.
+
+The third row is the reason for the capability probe. `PanelEventProvider.openPanel` arrived in
+api **1.0.57** and this plugin's floor is deliberately **1.0.20**, so on a real share of the
+installs this release is built to reach, a button would be dead. The probe is reflective rather
+than a trial call, because calling `openPanel` to find out whether it exists reveals a panel -
+and it is answered while the plugin registers, so the probe itself would pop the notice open.
+
+That is all it does otherwise:
 
 - **No secrets are read.** The component holds no `SecretDataProvider` and no list.
 - **No MCP tools.** `my_secrets_list` and `my_secret_get` moved to Secret Manager under the
@@ -50,7 +75,7 @@ those installs. `RetirementManifestTest` pins both, and the dependency declarati
 
 ```bash
 ./gradlew buildPluginJar
-./gradlew test    # 8 cases: the dependency, the floors, the panel identity, the version, the manifest selection
+./gradlew test    # 22 cases: the manifest facts, plus which button the notice offers
 ```
 
 ## License
