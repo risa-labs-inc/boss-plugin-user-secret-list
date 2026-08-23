@@ -2,9 +2,36 @@
 
 ## Project Overview
 
-**My Secrets (Dynamic)** (`ai.rever.boss.plugin.dynamic.usersecretlist`) is a dynamic plugin for the BOSS desktop application.
+**My Secrets (Dynamic)** (`ai.rever.boss.plugin.dynamic.usersecretlist`) is a **retired** dynamic
+plugin for the BOSS desktop application.
 
-View your secrets and shared credentials
+Retired - now the "Shared with me" section of Secret Manager
+
+## Retired: do not add features here
+
+The list this plugin served is now a section of
+[secret-manager](https://github.com/risa-labs-inc/boss-plugin-secret-manager). Two panels read
+the same vault and both listed the caller's own secrets; Secret Manager now has two sections
+split on how each secret reached you.
+
+What is left is a pointer panel (`MovedNotice`) in the same slot with the same icon, plus a
+declared dependency on Secret Manager so the host offers to install it. Three things to keep if
+you touch this repo at all:
+
+- **No MCP tools.** `my_secrets_list` / `my_secret_get` moved to Secret Manager under the same
+  names. A second copy of `my_secret_get` here is how it once shipped without the
+  `ai-provider` refusal `secret_get` carries and read exactly the keys that gate withholds.
+  One gate, one implementation.
+- **Do not raise `minBossVersion` or `apiVersion`.** This release has to reach every host that
+  still shows the old panel; a raised floor makes the updater skip precisely those installs.
+  `RetirementManifestTest` pins both.
+- **Keep the panel id, icon and slot.** A saved sidebar layout keys on the panel id, and the
+  user has had that Key icon in that slot since their first run. Move it and the notice
+  explaining where their secrets went is the thing that disappears.
+
+The host removes this plugin on startup once Secret Manager is installed at or above the version
+that has the sections (BossConsole `RetiredPlugins`). The notice covers older hosts, which have
+no such pass.
 
 - **Plugin ID**: `ai.rever.boss.plugin.dynamic.usersecretlist`
 - **Main Class**: `ai.rever.boss.plugin.dynamic.usersecretlist.UserSecretListDynamicPlugin`
@@ -35,9 +62,8 @@ build.gradle.kts   → Build config + version (single source of truth)
 ### Key Patterns
 - Entry point: `DynamicPlugin` interface with `register(context)` and `dispose()`
 - UI: `PanelComponentWithUI` with `@Composable Content()`
-- State: ViewModel pattern with `StateFlow`
-- Providers from `PluginContext`: `workspaceDataProvider`, `splitViewOperations`, `contextMenuProvider`, `activeTabsProvider`
-- Null-safe provider access: providers may be null, UI must handle gracefully
+- There is no ViewModel and no provider access any more - see "Retired" above. The whole
+  plugin is `UserSecretListDynamicPlugin` -> `UserSecretListComponent` -> `MovedNotice`.
 
 ### Dependencies
 - **boss-plugin-api**: compileOnly (provided by host app at runtime)

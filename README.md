@@ -1,61 +1,57 @@
-# BOSS My Secrets
+# BOSS My Secrets (retired)
 
-A read-only view of the secrets you own and the ones shared with you, in the right sidebar.
+**This plugin is retired.** Its list is now the "Shared with me" section of
+[Secret Manager](https://github.com/risa-labs-inc/boss-plugin-secret-manager). Install that
+instead; there is nothing here to install for its own sake.
 
-The consumer-side counterpart to [Secret
-Manager](https://github.com/risa-labs-inc/boss-plugin-secret-manager). Both read the same
-`SecretDataProvider`, but this panel adds the sharing dimension Secret Manager's list does not
-show, and deliberately offers no management controls at all.
+## Why it went away
 
-## What it does
+Two panels sat next to each other in the right sidebar reading the same vault:
 
-- **Lists secrets you own plus secrets shared with you**, through
-  `getUserSecretsWithSharingInfo`.
-- **Owner and Shared badges**, with the access level for shared entries.
-- **Filter** by website or username, applied client-side over what is loaded.
-- **Copy** a website or username to the clipboard.
-- **Expand an entry** for its metadata: tags, notes, expiration, and who shared it.
-- **Paged at 50** with a load-more control, and it surfaces how long the last load took.
+| | Secret Manager | My Secrets (this plugin) |
+|---|---|---|
+| Reads | `getUserSecrets` (own + organisation) | `getUserSecretsWithSharingInfo` (own + organisation + shared) |
+| Does | full CRUD, sharing, Store API keys, AI provider settings | read-only list with badges |
 
-Passwords are masked in the list. There are no edit, delete or share actions anywhere in this
-panel by design - use Secret Manager for those.
+**Both listed the caller's own secrets**, which is what made two panels confusing rather than
+complementary. Secret Manager now has two sections that partition the vault instead of
+overlapping it, split on how each secret reached you: what you can manage, and what someone
+shared with you.
 
-## MCP tools
+This plugin was also the one the first-run wizard installed by default while Secret Manager was
+not, so a typical install had the read-only half and not the half that can add an API key, even
+though every AI provider setting lives in Secret Manager.
 
-| Tool | Purpose |
-|---|---|
-| `my_secrets_list` | Your own and shared-with-you secrets, as metadata |
-| `my_secret_get` | Reveal the password and notes for one secret id |
+## What this version still does
 
-Both are gated on the `secret.read` permission.
+One panel, in the same slot with the same icon, saying where the list went. That is all:
 
-**`my_secret_get` refuses any secret tagged `ai-provider`**, matching Secret Manager's
-`secret_get`. Both plugins read the same store under the same gate, so a refusal in only
-one of them is not a refusal - the agent would just call the other tool. An agent that
-needs to *use* a provider goes through `PluginContext.llmProvider` and never needs the raw
-value.
+- **No secrets are read.** The component holds no `SecretDataProvider` and no list.
+- **No MCP tools.** `my_secrets_list` and `my_secret_get` moved to Secret Manager under the
+  same names, so nothing that calls them breaks. Leaving a second copy here is the exact shape
+  of the bug that once let `my_secret_get` read the AI provider keys `secret_get` withholds:
+  same vault, same `secret.read` gate, two implementations, one of them missing the check.
+  There is now one gate and one implementation of it.
+- **Secret Manager is declared as a dependency**, so a user who has this plugin and not that
+  one gets the host's install prompt when this version lands, rather than a dead sidebar icon.
+  Dependencies are not enforced at load time, so the notice still renders if they decline.
 
-The tag is compared trimmed and case-insensitively: an exact match fails *open* on a
-hand-edited tag, and nothing would signal it.
+A recent BOSS uninstalls this plugin for the user once Secret Manager is installed. On an older
+host it stays until removed by hand from the Toolbox, which is why the notice is a panel and not
+an absence.
 
 ## Requirements
 
-- BOSS >= 9.2.20, boss-plugin-api >= 1.0.20
-- `secretDataProvider`. Without it the plugin registers a stub panel and contributes no MCP
-  tools.
-- No external binaries.
-
-The panel itself is currently open to any authenticated user; only the MCP tools carry a
-permission gate.
+Unchanged on purpose: BOSS >= 9.2.20, boss-plugin-api >= 1.0.20. This release has to reach every
+host that still shows the old panel, and raising either floor would make the updater skip exactly
+those installs. `RetirementManifestTest` pins both, and the dependency declaration with them.
 
 ## Build
 
 ```bash
 ./gradlew buildPluginJar
-cp build/libs/boss-plugin-user-secret-list-*.jar ~/.boss/plugins/
+./gradlew test    # 2 cases: the dependency declaration and the version floors
 ```
-
-See [AGENTS.md](AGENTS.md) for architecture and conventions.
 
 ## License
 
