@@ -13,13 +13,18 @@ import com.arkivanov.decompose.ComponentContext
  * retired plugin should not keep a second copy of the vault in memory beside the panel that
  * replaced it.
  */
-class UserSecretListComponent(
+internal class UserSecretListComponent(
     ctx: ComponentContext,
     override val panelInfo: PanelInfo,
+    /**
+     * Lets the notice offer Open or Install. Null when the host gave us neither a panel-event
+     * provider nor a loader delegate, in which case the notice is text only.
+     */
+    private val link: SecretManagerLink? = null,
 ) : PanelComponentWithUI, ComponentContext by ctx {
 
     @Composable
     override fun Content() {
-        MovedNotice()
+        MovedNotice(link)
     }
 }

@@ -105,10 +105,16 @@ dependencies {
     implementation("com.arkivanov.decompose:decompose:3.3.0")
     implementation("com.arkivanov.essenty:lifecycle:2.5.0")
 
+    // Back, and declared rather than leaned on: the notice's Open/Install buttons launch a
+    // suspend `openPanel` and poll for the replacement appearing. Compose Desktop happens to
+    // bring coroutines transitively, so this compiled without it - which is exactly the kind of
+    // accident that breaks on a Compose bump.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+
     // Tests. This plugin had none, which is how `my_secret_get` shipped without the
-    // AI-provider refusal its sibling tool carries. What is left asserts the manifest
-    // facts the retirement rests on; nothing here needs a host or a live credential,
-    // and nothing suspends any more (the coroutines dependency went with the ViewModel).
+    // AI-provider refusal its sibling tool carries. What is left asserts the manifest facts the
+    // retirement rests on, plus which button the notice offers - neither needs a host or a live
+    // credential. `runBlocking` covers the suspend calls, so no coroutines-test dependency.
     testImplementation(kotlin("test"))
     // The api is compileOnly (the host supplies it at runtime), so it is absent from the
     // test runtime by default. Tests need it on the classpath explicitly - PanelId and the
