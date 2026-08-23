@@ -5,9 +5,15 @@
   "version": "1.0.6",
   "apiVersion": "1.0.20",
   "minBossVersion": "9.2.20",
+  "dependencies": [
+    {
+      "pluginId": "ai.rever.boss.plugin.dynamic.secretmanager",
+      "optional": false
+    }
+  ],
   "mainClass": "ai.rever.boss.plugin.dynamic.usersecretlist.UserSecretListDynamicPlugin",
   "type": "panel",
-  "description": "View your secrets and shared credentials",
+  "description": "Retired - now the \"Shared with me\" section of Secret Manager",
   "author": "Risa Labs",
   "url": "https://github.com/risa-labs-inc/boss-plugin-user-secret-list",
   "panel": {
@@ -20,6 +26,5 @@
     "heartbeatIntervalMs": 5000
   },
   "isolationMode": "out-of-process",
-  "fallback": "in-process",
-  "stateHolderClass": "ai.rever.boss.plugin.runtime.stateholders.SecretManagerStateHolder"
+  "fallback": "in-process"
 }

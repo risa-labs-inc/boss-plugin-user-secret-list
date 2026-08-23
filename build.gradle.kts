@@ -52,9 +52,12 @@ repositories {
  * at the cost of a much wider blast radius. Both the lookup and the error are deferred, so
  * this resolves when a task actually needs the jar rather than when Gradle configures.
  *
- * NOTE: plugin.json declares apiVersion 1.0.20 - the ai.rever.boss.plugin.logging and
- * .scrollbar packages used by this plugin were introduced in exactly that release (api tag
- * v1.0.20), so the declared minimum is accurate.
+ * NOTE: plugin.json declares apiVersion 1.0.20, and the reason is now the retirement rather
+ * than a symbol. The logging and scrollbar packages this comment used to cite went with the
+ * list; what is left uses `DynamicPlugin`, `PanelInfo` and `PanelComponentWithUI`, all of which
+ * long predate the floor. The floor stays low because this release has to reach *every* host
+ * that still shows the old panel - raising it makes the updater skip exactly those installs.
+ * Pinned by `RetirementManifestTest`.
  */
 val bossPluginApiJar: FileCollection =
     if (useLocalDependencies) {
@@ -101,26 +104,25 @@ dependencies {
     // Decompose for ComponentContext
     implementation("com.arkivanov.decompose:decompose:3.3.0")
     implementation("com.arkivanov.essenty:lifecycle:2.5.0")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
     // Tests. This plugin had none, which is how `my_secret_get` shipped without the
-    // AI-provider refusal its sibling tool carries. These run without a host or a
-    // live credential.
+    // AI-provider refusal its sibling tool carries. What is left asserts the manifest
+    // facts the retirement rests on; nothing here needs a host or a live credential,
+    // and nothing suspends any more (the coroutines dependency went with the ViewModel).
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    // BossLogger binds slf4j at class-init, so a backend is required or every class
-    // holding a logger fails with NoClassDefFoundError in tests. The host provides one
-    // at runtime; tests have to supply their own.
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
     // The api is compileOnly (the host supplies it at runtime), so it is absent from the
-    // test runtime by default. Tests need it on the classpath explicitly.
+    // test runtime by default. Tests need it on the classpath explicitly - PanelId and the
+    // Panel slot helpers are read directly.
     testImplementation(bossPluginApiJar)
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // An *independent* source of truth for the version assertion. Comparing the reported
+    // version against the bundled plugin.json is circular - both read the same file, so any
+    // value in it passes, including a stale one. This comes from Gradle instead, so it also
+    // catches a processResources that did not stamp. Same reasoning as secret-manager's.
+    systemProperty("boss.plugin.expectedVersion", version.toString())
 }
 
 // Task to build plugin JAR with compiled classes only

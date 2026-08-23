@@ -9,20 +9,12 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.Key
 
 /**
- * Panel info for User Secret List (Read-Only)
+ * Panel info for the retired My Secrets panel.
  *
- * This panel allows authenticated users to view secrets they own or that have been shared with them.
- * Features:
- * - Read-only view (website:username only, password masked)
- * - Ownership badges (Owner vs Shared)
- * - Client-side search/filter
- * - Copy website and username to clipboard
- * - View metadata (tags, notes, expiration, shared by info)
- * - No edit/delete/share actions
- *
- * Access Control:
- * - Accessible to all authenticated users
- * - Permission check for 'secrets.read' pending RBAC permission system (see docs/RBAC_GUIDE.md)
+ * The id, the icon and the slot are all unchanged on purpose. A saved sidebar layout keys on
+ * the panel id, and the user has had this Key icon in that slot since their first run - moving
+ * or renaming it would hide the one notice that explains where their list went. It now renders
+ * [MovedNotice] and reads no secrets at all.
  */
 object UserSecretListInfo : PanelInfo {
     override val id = PanelId("user-secret-list", 25)
