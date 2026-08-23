@@ -7,6 +7,10 @@ plugin for the BOSS desktop application.
 
 Retired - now the "Shared with me" section of Secret Manager
 
+- **Plugin ID**: `ai.rever.boss.plugin.dynamic.usersecretlist`
+- **Main Class**: `ai.rever.boss.plugin.dynamic.usersecretlist.UserSecretListDynamicPlugin`
+- **API Version**: 1.0.20
+
 ## Retired: do not add features here
 
 The list this plugin served is now a section of
@@ -27,15 +31,18 @@ you touch this repo at all:
   `RetirementManifestTest` pins both.
 - **Keep the panel id, icon and slot.** A saved sidebar layout keys on the panel id, and the
   user has had that Key icon in that slot since their first run. Move it and the notice
-  explaining where their secrets went is the thing that disappears.
+  explaining where their secrets went is the thing that disappears. Pinned, along with the
+  manifest's `panel.priority` agreeing with `PanelId`'s order - two independent copies of one
+  fact that nothing else would notice drifting.
 
 The host removes this plugin on startup once Secret Manager is installed at or above the version
 that has the sections (BossConsole `RetiredPlugins`). The notice covers older hosts, which have
 no such pass.
 
-- **Plugin ID**: `ai.rever.boss.plugin.dynamic.usersecretlist`
-- **Main Class**: `ai.rever.boss.plugin.dynamic.usersecretlist.UserSecretListDynamicPlugin`
-- **API Version**: 1.0.20
+`stateHolderClass` is gone from the manifest. It named *secret-manager's* host-side state holder
+for a panel that holds no state; only `PluginProcessMain` reads it, under `BOSS_MODE=KERNEL`,
+guarded by `isNotEmpty()` inside a try/catch - so both its absence and a missing class were
+already safe, and the honest value is none.
 
 ## Essential Commands
 
@@ -48,7 +55,8 @@ no such pass.
 ## Workflow Rules
 
 - Do NOT run the BOSS application to test. The user will test manually.
-- After building, copy JAR to `~/.boss/plugins/` for local testing.
+- There is nothing here to test by hand any more: the panel is a static notice. Build it to
+  check it compiles, and let `RetirementManifestTest` cover the manifest.
 
 ## Architecture
 
@@ -69,13 +77,30 @@ build.gradle.kts   → Build config + version (single source of truth)
 - **boss-plugin-api**: compileOnly (provided by host app at runtime)
 - **Compose Desktop**: UI framework
 - **Decompose**: Navigation and component lifecycle
-- **Coroutines**: Async operations
+
+Coroutines went with the ViewModel - nothing here suspends. So did the slf4j test backend, which
+existed because `BossLogger` binds at class-init and every deleted class held a logger.
 
 ## Version Management
 
 **`build.gradle.kts` is the single source of truth for version.**
 
 The `processResources` task automatically syncs the version into `plugin.json` at build time. Never manually edit the version in `plugin.json` - only change it in `build.gradle.kts`.
+
+`DynamicPlugin.version` reads that stamped manifest through `RetiredPluginVersion` rather than
+carrying a literal, which had already drifted to `1.0.5` against a manifest saying `1.2.5`.
+
+**Two traps that stamping creates, both now pinned by tests:**
+
+- **`processResources` is line-based and rewrites every `"version": "..."` line in the file.**
+  A `"version": "*"` inside the `dependencies` block therefore came out of the built jar as
+  `"version": "1.2.5"` - "requires secret-manager 1.2.5", using *this* plugin's number. The
+  field defaults to `"*"` and the host ignores it, so it is simply absent now. This was invisible
+  in the committed file and only showed up on reading the jar.
+- **Asserting the reported version against the bundled manifest is circular** - both read the
+  same file, so any value in it passes. The Test task injects
+  `boss.plugin.expectedVersion` from Gradle instead, which also catches a stamp that did not
+  happen.
 
 ## Code Quality
 

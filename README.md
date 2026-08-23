@@ -50,7 +50,7 @@ those installs. `RetirementManifestTest` pins both, and the dependency declarati
 
 ```bash
 ./gradlew buildPluginJar
-./gradlew test    # 2 cases: the dependency declaration and the version floors
+./gradlew test    # 6 cases: the dependency, the version floors, the panel identity, the version
 ```
 
 ## License

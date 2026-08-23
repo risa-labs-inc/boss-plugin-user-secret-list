@@ -8,7 +8,6 @@
   "dependencies": [
     {
       "pluginId": "ai.rever.boss.plugin.dynamic.secretmanager",
-      "version": "*",
       "optional": false
     }
   ],
@@ -27,6 +26,5 @@
     "heartbeatIntervalMs": 5000
   },
   "isolationMode": "out-of-process",
-  "fallback": "in-process",
-  "stateHolderClass": "ai.rever.boss.plugin.runtime.stateholders.SecretManagerStateHolder"
+  "fallback": "in-process"
 }

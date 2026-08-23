@@ -25,9 +25,14 @@ import ai.rever.boss.plugin.api.PluginContext
  * every installed host, including the old ones, or the panel it is replacing stays.
  */
 class UserSecretListDynamicPlugin : DynamicPlugin {
-    override val pluginId: String = "ai.rever.boss.plugin.dynamic.usersecretlist"
+    override val pluginId: String = RetiredPluginVersion.PLUGIN_ID
     override val displayName: String = "My Secrets (Dynamic)"
-    override val version: String = "1.0.5"
+
+    /**
+     * From the bundled manifest, not a literal: the literal said `1.0.5` against a manifest
+     * saying `1.2.5`. See [RetiredPluginVersion].
+     */
+    override val version: String = RetiredPluginVersion.read()
     override val description: String = "Retired - now the \"Shared with me\" section of Secret Manager"
     override val author: String = "Risa Labs"
     override val url: String = "https://github.com/risa-labs-inc/boss-plugin-user-secret-list"

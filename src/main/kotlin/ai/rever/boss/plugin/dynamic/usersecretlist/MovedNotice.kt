@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
@@ -21,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -39,6 +42,9 @@ internal fun MovedNotice() {
                 Modifier
                     .fillMaxSize()
                     .background(BossThemeColors.BackgroundColor)
+                    // Scrollable because this panel lives in a slot the user can drag short,
+                    // and five stacked elements in a fixed Box put the last line out of reach.
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -63,6 +69,9 @@ internal fun MovedNotice() {
                         "alongside the secrets you own.",
                     color = BossThemeColors.TextSecondary,
                     fontSize = 13.sp,
+                    // Centred like the column that holds it: without this the block is centred
+                    // but every wrapped line inside it is left-ragged.
+                    textAlign = TextAlign.Center,
                 )
                 Row(
                     modifier =
@@ -80,7 +89,10 @@ internal fun MovedNotice() {
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        "Open Secret Manager from the sidebar.",
+                        // Both states, because this plugin cannot tell which one it is in:
+                        // dependencies are not enforced at load time, so the user who declined
+                        // the install prompt is exactly the user reading this.
+                        "Open Secret Manager from the sidebar, or install it from the Plugin Store.",
                         color = BossThemeColors.TextPrimary,
                         fontSize = 13.sp,
                     )
@@ -90,6 +102,7 @@ internal fun MovedNotice() {
                         "Secret Manager is installed.",
                     color = BossThemeColors.TextSecondary.copy(alpha = 0.7f),
                     fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
                 )
             }
         }

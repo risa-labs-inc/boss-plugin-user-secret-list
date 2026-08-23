@@ -1,32 +1,74 @@
 package ai.rever.boss.plugin.dynamic.usersecretlist
 
+import ai.rever.boss.plugin.api.Panel.Companion.bottom
+import ai.rever.boss.plugin.api.Panel.Companion.right
+import ai.rever.boss.plugin.api.Panel.Companion.top
+import ai.rever.boss.plugin.api.PanelId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The two manifest facts this retirement rests on.
+ * The manifest facts this retirement rests on, and the panel identity the notice is reached by.
  *
- * Neither is exercised by anything else, and both fail silently: a dropped dependency just
- * means no install prompt, and a raised floor just means the update never reaches the hosts
- * that still show the old panel. There is deliberately no test of `register()` itself -
- * `PluginContext` has 71 abstract members, and the thing worth asserting about it (that no MCP
- * tools are contributed any more) is guaranteed by the tool file being deleted, which is a
- * compile-time fact rather than a runtime one.
+ * All of them fail silently: a dropped or optional-ised dependency just means no install
+ * prompt, a raised floor means the update never reaches the hosts that still show the old
+ * panel, and a changed panel id means a saved sidebar layout stops resolving the one panel that
+ * explains where the user's secrets went. AGENTS.md lists the three invariants; the fourth
+ * (no MCP tools) is guaranteed by the tool file being deleted, which is a compile-time fact.
  *
- * Read from the classpath, filtered on `pluginId`, for the reason `PluginVersionSource`
- * documents in the sibling plugin: every BOSS plugin ships this resource at the same path.
+ * There is deliberately no test of `register()`: `PluginContext` has 71 abstract members.
+ *
+ * Read from the classpath, filtered on `pluginId`, for the reason [RetiredPluginVersion]
+ * documents: every BOSS plugin ships this resource at the same path.
  */
 class RetirementManifestTest {
     @Test
-    fun `the manifest points at Secret Manager as a dependency`() {
-        // What turns "your panel says it moved" into "the host offers to install the thing it
-        // moved to": PluginUpdateBridge reports missing dependencies on update, so a user who
-        // has this plugin and not Secret Manager gets a prompt rather than a dead end.
+    fun `Secret Manager is a required dependency, not an optional one`() {
+        // Both halves matter, and a substring search over the whole file proves neither: the id
+        // also appears in prose, and flipping `optional` to true quietly turns the host's
+        // "needs Secret Manager, which is not installed" prompt into "works without it".
+        val block =
+            assertNotNull(
+                Regex("\"dependencies\"\\s*:\\s*\\[(.*?)]", RegexOption.DOT_MATCHES_ALL)
+                    .find(manifest)
+                    ?.groupValues
+                    ?.get(1),
+                "the manifest declares no dependencies block: $manifest",
+            )
+
         assertTrue(
-            manifest.contains("ai.rever.boss.plugin.dynamic.secretmanager"),
-            "the manifest no longer names Secret Manager: $manifest",
+            block.contains("\"ai.rever.boss.plugin.dynamic.secretmanager\""),
+            "the dependencies block does not name Secret Manager: $block",
+        )
+        assertEquals(
+            "false",
+            Regex("\"optional\"\\s*:\\s*(true|false)").find(block)?.groupValues?.get(1),
+            "the Secret Manager dependency is optional, so the host will not offer to install it: $block",
+        )
+    }
+
+    @Test
+    fun `the dependency declares no version, because processResources would rewrite it`() {
+        // processResources stamps the build version into every line matching "version": "...",
+        // and it is line-based - so a `"version": "*"` inside the dependencies block came out of
+        // the jar as `"version": "1.2.5"`, i.e. "requires secret-manager 1.2.5", which is this
+        // plugin's version and nonsense as a requirement. PluginDependency.version defaults to
+        // "*" and the host ignores it anyway, so the line is better absent.
+        //
+        // Only visible by reading the built jar; the committed file looked fine.
+        val block =
+            assertNotNull(
+                Regex("\"dependencies\"\\s*:\\s*\\[(.*?)]", RegexOption.DOT_MATCHES_ALL)
+                    .find(manifest)
+                    ?.groupValues
+                    ?.get(1),
+                "no dependencies block",
+            )
+        assertTrue(
+            !block.contains("\"version\""),
+            "the dependency declares a version, which processResources will rewrite: $block",
         )
     }
 
@@ -39,6 +81,40 @@ class RetirementManifestTest {
         assertEquals("1.0.20", value("apiVersion"))
     }
 
+    @Test
+    fun `the panel keeps the id and slot a saved sidebar layout resolves`() {
+        // The user has had this panel in this slot since their first run. Move it and the notice
+        // explaining where their secrets went is the thing that disappears.
+        assertEquals(PanelId("user-secret-list", 25), UserSecretListInfo.id)
+        assertEquals(right.top.bottom, UserSecretListInfo.defaultSlotPosition)
+    }
+
+    @Test
+    fun `the manifest panel block agrees with the panel id`() {
+        // Two independent copies of one fact: PanelId's order and the manifest's priority.
+        // Nothing else notices if they drift.
+        assertEquals("25", value("priority"))
+        assertEquals("right_top_bottom", value("position"))
+    }
+
+    @Test
+    fun `the reported version is the built one, not a literal`() {
+        // The class used to say 1.0.5 while the manifest said 1.2.5. This is the release whose
+        // version decides whether a host retires the plugin, so a second source of truth for it
+        // is worth a test rather than a comment.
+        //
+        // Asserted against the *Gradle* version, not the bundled manifest: both the class and
+        // the manifest read the same file, so comparing them to each other passes for any value
+        // in it. This way a processResources that did not stamp fails too.
+        val expected =
+            assertNotNull(
+                System.getProperty("boss.plugin.expectedVersion"),
+                "boss.plugin.expectedVersion is not set - see the Test task in build.gradle.kts",
+            )
+        assertEquals(expected, value("version"), "processResources did not stamp the packaged manifest")
+        assertEquals(expected, UserSecretListDynamicPlugin().version, "the class reports a stale literal")
+    }
+
     private companion object {
         val manifest: String =
             checkNotNull(
@@ -46,12 +122,14 @@ class RetirementManifestTest {
                     .getResources("META-INF/boss-plugin/plugin.json")
                     .toList()
                     .map { it.readText() }
-                    .firstOrNull { it.contains("\"ai.rever.boss.plugin.dynamic.usersecretlist\"") },
+                    .firstOrNull { it.contains("\"${RetiredPluginVersion.PLUGIN_ID}\"") },
             ) { "no plugin.json on the classpath declares this plugin's id" }
 
-        fun value(key: String): String? =
-            Regex("\"$key\"\\s*:\\s*\"([^\"]+)\"").find(manifest)?.groupValues?.get(1).also {
-                assertNotNull(it, "$key is missing from the manifest")
-            }
+        /** Non-null by construction: `assertNotNull` returns the value, so callers get a `String`. */
+        fun value(key: String): String =
+            assertNotNull(
+                Regex("\"$key\"\\s*:\\s*\"?([^\",}\\s]+)\"?").find(manifest)?.groupValues?.get(1),
+                "$key is missing from the manifest",
+            )
     }
 }
