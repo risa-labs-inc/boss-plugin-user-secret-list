@@ -29,6 +29,15 @@ you touch this repo at all:
 - **Do not raise `minBossVersion` or `apiVersion`.** This release has to reach every host that
   still shows the old panel; a raised floor makes the updater skip precisely those installs.
   `RetirementManifestTest` pins both.
+- **`"optional": false` is safe, and it was checked rather than assumed.** The pointer panel only
+  renders if a missing required dependency does not block *loading* - on the oldest host in the
+  range, not just current main. Verified against the tags: at `v9.2.20` the only live read of
+  `manifest.dependencies` is `checkCanUnload` (refusing to unload a dependency, not to load a
+  dependent); `v9.3.20` has none in composeApp at all; `v9.4.15` and `v9.4.30` have
+  `PluginDependencyResolution` and `MissingDependencyReporter`, both of which *report*.
+  `PluginDependencyResolver` was never constructed anywhere in the repo's history. If that ever
+  changes, `optional: true` is the safer trade - the install prompt is a nice-to-have, the notice
+  rendering is the whole point.
 - **Keep the panel id, icon and slot.** A saved sidebar layout keys on the panel id, and the
   user has had that Key icon in that slot since their first run. Move it and the notice
   explaining where their secrets went is the thing that disappears. Pinned, along with the
@@ -89,6 +98,20 @@ The `processResources` task automatically syncs the version into `plugin.json` a
 
 `DynamicPlugin.version` reads that stamped manifest through `RetiredPluginVersion` rather than
 carrying a literal, which had already drifted to `1.0.5` against a manifest saying `1.2.5`.
+
+**It selects its own manifest by `mainClass`, and neither the id nor the `pluginId` field would
+do.** Every plugin ships `plugin.json` at the same path and lookup is parent-first, so the
+document has to be identified rather than assumed. A bare `contains("<our id>")` matches any
+manifest that merely *mentions* the id - and this release created that situation, by declaring a
+dependency on secret-manager. `"pluginId": "<our id>"` is no better: **a dependency entry uses
+that same key**, so the obvious one-line fix for the substring bug still had the bug. `mainClass`
+names a type that exists only in this jar and cannot appear inside a dependency entry, and
+`the manifest names the class the host will load` keeps the constant and the manifest in step.
+
+The selection is a separate `internal` function because testing the *pattern* proved nothing:
+with only our own manifest on the test classpath, a reader matching a bare substring passed
+either way. The test feeds `selectOwnManifest` an imposter first, which is the parent-first
+ordering that actually breaks it.
 
 **Two traps that stamping creates, both now pinned by tests:**
 

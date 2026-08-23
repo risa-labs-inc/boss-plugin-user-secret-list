@@ -18,7 +18,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +53,10 @@ internal fun MovedNotice() {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Icon(
-                    Icons.Default.Share,
+                    // The Key the user just clicked in the sidebar, not a Share glyph: the whole
+                    // reason the panel id and icon are unchanged is "this is the thing you
+                    // clicked", and the hero icon is where that lands hardest.
+                    Icons.Default.VpnKey,
                     contentDescription = null,
                     tint = BossThemeColors.TextSecondary,
                     modifier = Modifier.size(48.dp),

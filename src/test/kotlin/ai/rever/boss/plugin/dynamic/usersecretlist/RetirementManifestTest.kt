@@ -6,6 +6,7 @@ import ai.rever.boss.plugin.api.Panel.Companion.top
 import ai.rever.boss.plugin.api.PanelId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -26,6 +27,14 @@ import kotlin.test.assertTrue
 class RetirementManifestTest {
     @Test
     fun `Secret Manager is a required dependency, not an optional one`() {
+        // `optional: false` is safe only because a missing required dependency has never blocked
+        // *loading*, and that had to hold on the OLDEST host this ships to, not just current
+        // main - the floor is deliberately 9.2.20. Checked against the tags rather than assumed:
+        // at v9.2.20 the only live read of manifest.dependencies is checkCanUnload (refusing to
+        // unload a dependency, not to load a dependent); v9.3.20 has none in composeApp at all;
+        // v9.4.15 and v9.4.30 have PluginDependencyResolution and MissingDependencyReporter,
+        // both of which report. `PluginDependencyResolver` was never constructed anywhere in the
+        // repo's history. So the pointer panel renders even if the user declines the install.
         // Both halves matter, and a substring search over the whole file proves neither: the id
         // also appears in prose, and flipping `optional` to true quietly turns the host's
         // "needs Secret Manager, which is not installed" prompt into "works without it".
@@ -98,6 +107,56 @@ class RetirementManifestTest {
     }
 
     @Test
+    fun `the manifest names the class the host will load`() {
+        // A second copy of a Kotlin FQN that no compiler checks. Rename or move the class and you
+        // get a green build, a green test run, and a plugin the host cannot instantiate - so the
+        // notice simply never appears. Same silent-failure class as the other assertions here.
+        //
+        // Now load-bearing twice over: RetiredPluginVersion picks its own manifest off this
+        // field, so a drift here also makes the reported version fall back to unknown.
+        assertEquals(UserSecretListDynamicPlugin::class.qualifiedName, value("mainClass"))
+        assertEquals(RetiredPluginVersion.MAIN_CLASS, value("mainClass"))
+    }
+
+    @Test
+    fun `a manifest that only depends on this plugin is not mistaken for it`() {
+        // This release establishes the pattern of one manifest naming another plugin's id, in a
+        // dependencies block. A bare substring match is satisfied by that - and so is
+        // `"pluginId": "<id>"`, because a dependency entry uses the SAME key, which is how the
+        // obvious one-line fix for the substring bug still had the bug. mainClass is the field a
+        // dependency entry cannot carry.
+        val dependsOnUs =
+            """{"pluginId":"ai.rever.boss.plugin.dynamic.other","version":"9.9.9",
+               "dependencies":[{"pluginId":"${RetiredPluginVersion.PLUGIN_ID}"}]}"""
+
+        assertTrue(dependsOnUs.contains("\"${RetiredPluginVersion.PLUGIN_ID}\""), "precondition: it names us")
+        assertTrue(
+            Regex("\"pluginId\"\\s*:\\s*\"${RetiredPluginVersion.PLUGIN_ID}\"").containsMatchIn(dependsOnUs),
+            "precondition: a dependency entry uses the pluginId key too, so that field is not enough",
+        )
+        assertFalse(
+            RetiredPluginVersion.OURS.containsMatchIn(dependsOnUs),
+            "a manifest that only depends on this plugin was matched as being it",
+        )
+        assertTrue(RetiredPluginVersion.OURS.containsMatchIn(manifest), "our own manifest no longer matches")
+
+        // The selection, not just the pattern. With only our own manifest on the test classpath
+        // a reader matching a bare substring passes either way, so this puts the imposter first -
+        // which is the ordering that actually breaks it, since resource lookup is parent-first.
+        assertEquals(
+            manifest,
+            RetiredPluginVersion.selectOwnManifest(sequenceOf(dependsOnUs, manifest)),
+            "the reader picked a manifest that merely depends on this plugin",
+        )
+        assertEquals(
+            value("version"),
+            RetiredPluginVersion.selectOwnManifest(sequenceOf(dependsOnUs, manifest))
+                ?.let { RetiredPluginVersion.versionIn(it) },
+            "the version came from the wrong manifest",
+        )
+    }
+
+    @Test
     fun `the reported version is the built one, not a literal`() {
         // The class used to say 1.0.5 while the manifest said 1.2.5. This is the release whose
         // version decides whether a host retires the plugin, so a second source of truth for it
@@ -122,8 +181,14 @@ class RetirementManifestTest {
                     .getResources("META-INF/boss-plugin/plugin.json")
                     .toList()
                     .map { it.readText() }
-                    .firstOrNull { it.contains("\"${RetiredPluginVersion.PLUGIN_ID}\"") },
-            ) { "no plugin.json on the classpath declares this plugin's id" }
+                    // The pluginId FIELD, not a substring: a manifest that merely declares a
+                    // dependency on this plugin mentions the id too, so the bare `contains` this
+                    // replaced could have had a green test reading someone else's manifest.
+                    .let { RetiredPluginVersion.selectOwnManifest(it.asSequence()) },
+            ) {
+                "no plugin.json on the classpath names this plugin's mainClass - see " +
+                    "RetiredPluginVersion.OURS, and note the manifest and the constant must agree"
+            }
 
         /** Non-null by construction: `assertNotNull` returns the value, so callers get a `String`. */
         fun value(key: String): String =
