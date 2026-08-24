@@ -212,6 +212,12 @@ class SecretManagerLinkTest {
  * about. Separate so each fake says only what it is for.
  */
 internal abstract class StubLoader : PluginLoaderDelegate {
+    /**
+     * Derived from [getLoadedPlugins] so a fake only has to say one thing. Subclasses still
+     * override it where the point of the fake is that the two disagree.
+     */
+    override fun isPluginLoaded(pluginId: String): Boolean = getLoadedPlugins().any { it.pluginId == pluginId }
+
     override suspend fun loadPlugin(jarPath: String) = null
 
     override suspend fun unloadPlugin(pluginId: String) = false

@@ -46,7 +46,12 @@ you touch this repo at all:
 
 The host removes this plugin on startup once Secret Manager is installed at or above the version
 that has the sections (BossConsole `RetiredPlugins`). The notice covers older hosts, which have
-no such pass.
+no such pass - and its Uninstall button is how a user on one of those gets rid of it by hand.
+
+`stateHolderClass` is gone from the manifest. It named *secret-manager's* host-side state holder
+for a panel that holds no state; only `PluginProcessMain` reads it, under `BOSS_MODE=KERNEL`,
+guarded by `isNotEmpty()` inside a try/catch - so both its absence and a missing class were
+already safe, and the honest value is none.
 
 ### The notice's button
 
@@ -72,10 +77,35 @@ The `methodNamesOf` seam exists because the probe is otherwise untestable: `open
 default body, and Kotlin synthesises an override into every implementing class, so a hand-written
 fake that does *not* override it still reports the method and the "old host" case is unreachable.
 
-`stateHolderClass` is gone from the manifest. It named *secret-manager's* host-side state holder
-for a panel that holds no state; only `PluginProcessMain` reads it, under `BOSS_MODE=KERNEL`,
-guarded by `isNotEmpty()` inside a try/catch - so both its absence and a missing class were
-already safe, and the honest value is none.
+### The uninstall button
+
+`SelfUninstall` removes this plugin from inside it, for the hosts the automatic pass never reaches
+- one older than `RetiredPlugins`, or a machine that never installed Secret Manager. Unlike Open
+and Install it needs nothing newer than the floor, which is the point: those hosts are the old
+ones.
+
+**Delete the jar, then disable. The order is the design.** `disablePlugin` calls
+`trackingContext.unregisterAll()`, which takes this panel off the sidebar - so it must be last, or
+the coroutine doing the work is cancelled partway and the jar survives, which is the one outcome
+that brings the plugin back at the next launch. Pinned by a test that records the *sequence*,
+because both orders leave the same end state in a fake.
+
+**There is deliberately no `unloadPlugin`.** Uninstalling yourself by unloading yourself is a
+classloader pulling out its own foundation - the host's `PluginRemoval` says it plainly:
+"deleting a jar out from under a live classloader is how you get `NoClassDefFoundError` from code
+that is still running". Disabling reaches the same observable state (panel gone, and
+`PluginPersistence.setPluginEnabled` writes `enabled = false` so the next launch skips the row
+instead of reporting a missing file) without this code being torn out mid-call. The jar is already
+deleted, so a re-enable has nothing to load.
+
+**"Could not ask" is not "nothing to delete".** The first version collapsed them, and a delegate
+that threw on every call then reported "removed, restart to finish" while nothing at all had
+happened. A failed `getLoadedPlugins` is now `FAILED` outright; a *blank* recorded path stays a
+legitimate state, since disabling alone still stops the plugin loading.
+
+The confirmation is a two-step button rather than a dialog: `BossDialog` lives in plugin-ui-core
+above this plugin's floor, and a button that becomes its own confirmation needs no api at all.
+It runs on the **plugin** scope, not the composition's, for the same reason the ordering matters.
 
 ## Essential Commands
 
@@ -88,8 +118,8 @@ already safe, and the honest value is none.
 ## Workflow Rules
 
 - Do NOT run the BOSS application to test. The user will test manually.
-- There is nothing here to test by hand any more: the panel is a static notice. Build it to
-  check it compiles, and let `RetirementManifestTest` cover the manifest.
+- The panel has three controls now (Open / Install / Uninstall), so it is worth a look in a
+  dev-mode host if you touch them - but the decisions behind them are all unit-tested.
 
 ## Architecture
 
@@ -110,9 +140,11 @@ build.gradle.kts   → Build config + version (single source of truth)
 - **boss-plugin-api**: compileOnly (provided by host app at runtime)
 - **Compose Desktop**: UI framework
 - **Decompose**: Navigation and component lifecycle
+- **Coroutines**: the notice's buttons launch a suspend `openPanel` and the uninstall, and it
+  polls for Secret Manager appearing
 
-Coroutines went with the ViewModel - nothing here suspends. So did the slf4j test backend, which
-existed because `BossLogger` binds at class-init and every deleted class held a logger.
+The slf4j test backend went with the ViewModel, which is what needed it: `BossLogger` binds at
+class-init and every deleted class held a logger. Nothing left does.
 
 ## Version Management
 

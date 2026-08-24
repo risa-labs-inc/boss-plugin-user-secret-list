@@ -2,6 +2,9 @@ package ai.rever.boss.plugin.dynamic.usersecretlist
 
 import ai.rever.boss.plugin.api.DynamicPlugin
 import ai.rever.boss.plugin.api.PluginContext
+import ai.rever.boss.plugin.api.PluginLoaderDelegate
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Retired. This plugin's list is now the "Shared with me" section of Secret Manager
@@ -41,11 +44,15 @@ class UserSecretListDynamicPlugin : DynamicPlugin {
         // Read once here rather than per panel construction: the providers do not change for the
         // life of the plugin, and the reflective capability probe should not run per composition.
         val link = SecretManagerLink.from(context)
+        val uninstall = SelfUninstall(runCatching { context.getPluginAPI(PluginLoaderDelegate::class.java) }.getOrNull())
+        // The plugin scope, so an uninstall is not cancelled by the panel it removes. Falls back
+        // to a scope of our own rather than dropping the button on a host that gives us none.
+        val workScope = context.pluginScope ?: CoroutineScope(Dispatchers.Main)
 
         // The panel id and icon are unchanged, so a saved sidebar layout still resolves it and
         // the user finds the notice where the list used to be.
         context.panelRegistry.registerPanel(UserSecretListInfo) { ctx, panelInfo ->
-            UserSecretListComponent(ctx, panelInfo, link)
+            UserSecretListComponent(ctx, panelInfo, link, uninstall, workScope)
         }
     }
 }

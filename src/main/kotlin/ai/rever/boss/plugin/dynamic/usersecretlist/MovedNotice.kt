@@ -20,6 +20,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.VpnKey
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -48,7 +50,16 @@ import kotlinx.coroutines.launch
  * failure mode of a retirement is a user who thinks their secrets are gone.
  */
 @Composable
-internal fun MovedNotice(link: SecretManagerLink?) {
+internal fun MovedNotice(
+    link: SecretManagerLink?,
+    uninstall: SelfUninstall?,
+    /**
+     * Where the uninstall runs. NOT the composition's scope: its last step unregisters this panel,
+     * which cancels a composition-scoped coroutine - and if that happened before the jar was
+     * deleted, the plugin would be back at the next launch. The plugin scope outlives the panel.
+     */
+    workScope: CoroutineScope?,
+) {
     // Re-read on every entry into composition rather than once at registration: the user can
     // install Secret Manager from the Toolbox and come straight back here, and a value captured
     // when the plugin loaded would still say "not installed" and offer the Toolbox again.
@@ -56,6 +67,12 @@ internal fun MovedNotice(link: SecretManagerLink?) {
     val canOpenPanels = remember(link) { link?.canOpenPanels() == true }
     val action = movedNoticeAction(secretManagerInstalled = installed, canOpenPanels = canOpenPanels)
     val scope = rememberCoroutineScope()
+
+    // Two-step rather than a dialog: BossDialog lives in plugin-ui-core above this plugin's 1.0.20
+    // floor, and the whole point of that floor is the old hosts. A button that changes into its own
+    // confirmation needs no api at all.
+    var confirming by remember { mutableStateOf(false) }
+    var outcome by remember { mutableStateOf<UninstallOutcome?>(null) }
 
     // Cheap: isPluginLoaded is a map lookup, no I/O. It is what makes the button flip while the
     // notice is on screen, which is the whole path this feature exists for - install it, come
@@ -152,8 +169,22 @@ internal fun MovedNotice(link: SecretManagerLink?) {
                             )
                         }
                 }
+                UninstallControl(
+                    enabled = uninstall != null && workScope != null,
+                    confirming = confirming,
+                    outcome = outcome,
+                    onAsk = { confirming = true },
+                    onCancel = { confirming = false },
+                    onConfirm = {
+                        confirming = false
+                        // On workScope, not `scope`: see the parameter's KDoc. The last step of
+                        // the uninstall takes this panel off the sidebar, so the coroutine has to
+                        // outlive the composition it was started from.
+                        workScope?.launch { outcome = uninstall?.run() }
+                    },
+                )
                 Text(
-                    "This panel can be uninstalled. A recent BOSS removes it for you once " +
+                    "A recent BOSS removes this panel for you once " +
                         "Secret Manager is installed.",
                     color = BossThemeColors.TextSecondary.copy(alpha = 0.7f),
                     fontSize = 11.sp,
@@ -161,6 +192,78 @@ internal fun MovedNotice(link: SecretManagerLink?) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The uninstall affordance: a quiet text button, its own confirmation, then what happened.
+ *
+ * Quiet on purpose - Open or Install is the action most people want, and this one is destructive
+ * enough to deserve a second press but not enough to shout for attention.
+ */
+@Composable
+private fun UninstallControl(
+    enabled: Boolean,
+    confirming: Boolean,
+    outcome: UninstallOutcome?,
+    onAsk: () -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    when {
+        // Terminal: REMOVED normally never renders, because the panel is gone by then. It is here
+        // for the case where this composition outlives the unregister by a frame.
+        outcome != null ->
+            Text(
+                when (outcome) {
+                    UninstallOutcome.REMOVED -> "Removed."
+                    UninstallOutcome.REMOVED_RESTART_REQUIRED ->
+                        "Removed. It will be gone from the sidebar after you restart BOSS."
+                    UninstallOutcome.FAILED ->
+                        "Could not remove it from here. The Toolbox can uninstall it."
+                },
+                color =
+                    if (outcome == UninstallOutcome.FAILED) {
+                        BossThemeColors.ErrorColor
+                    } else {
+                        BossThemeColors.TextSecondary
+                    },
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+            )
+
+        confirming ->
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    "Remove this panel for good?",
+                    color = BossThemeColors.TextPrimary,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = onConfirm) {
+                        Text("Remove", color = BossThemeColors.ErrorColor, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text("Keep it", color = BossThemeColors.TextSecondary, fontSize = 12.sp)
+                    }
+                }
+                Text(
+                    "You can install it again from the Plugin Store.",
+                    color = BossThemeColors.TextSecondary.copy(alpha = 0.7f),
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+        enabled ->
+            TextButton(onClick = onAsk) {
+                Text("Uninstall this panel", color = BossThemeColors.TextSecondary, fontSize = 12.sp)
+            }
     }
 }
 
