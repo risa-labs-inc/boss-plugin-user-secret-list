@@ -24,7 +24,8 @@ though every AI provider setting lives in Secret Manager.
 
 ## What this version still does
 
-One panel, in the same slot with the same icon, saying where the list went - with one button on it:
+One panel, in the same slot with the same icon, saying where the list went - with a button for
+getting to Secret Manager, and one for removing this panel entirely:
 
 | Secret Manager | The notice offers |
 |---|---|
@@ -48,6 +49,17 @@ api **1.0.57** and this plugin's floor is deliberately **1.0.20**, so on a real 
 installs this release is built to reach, a button would be dead. The probe is reflective rather
 than a trial call, because calling `openPanel` to find out whether it exists reveals a panel -
 and it is answered while the plugin registers, so the probe itself would pop the notice open.
+
+**Uninstall** removes this plugin from inside itself, for the hosts the automatic pass never
+reaches: one older than the release that added it, or a machine that never installed Secret
+Manager. It deletes the jar and its signature sidecar, then disables the plugin - in that order,
+because disabling unregisters this panel and would cancel the work halfway, leaving the jar to
+load again at the next launch. There is deliberately no `unloadPlugin` call: uninstalling yourself
+by unloading yourself is a classloader pulling out its own foundation. Two-step confirmation, and
+you can install it again from the Plugin Store.
+
+Unlike Open and Install, Uninstall needs nothing newer than the api floor - which is the point,
+since the hosts without the automatic pass are the old ones.
 
 That is all it does otherwise:
 
@@ -75,7 +87,7 @@ those installs. `RetirementManifestTest` pins both, and the dependency declarati
 
 ```bash
 ./gradlew buildPluginJar
-./gradlew test    # 22 cases: the manifest facts, plus which button the notice offers
+./gradlew test    # 31 cases: the manifest facts, the notice's buttons, the self-uninstall
 ```
 
 ## License
