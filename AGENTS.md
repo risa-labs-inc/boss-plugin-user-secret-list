@@ -59,6 +59,11 @@ already safe, and the honest value is none.
 confined to it. `movedNoticeAction` is the decision, as a pure function, because it is the one
 thing here worth testing and the plugin itself cannot be instantiated in a test.
 
+Note the two install routes are gated on *different* things: asking the Toolbox needs a `boss://`
+link and a recent Toolbox, opening a panel needs api 1.0.57. So the ask route can be live on a
+host where the open route is not - which is the population this plugin exists to reach, and why
+the two flags stay independent in `movedNoticeAction` rather than one implying the other.
+
 Three things that are easy to get wrong, all pinned:
 
 - **"Installed" is not `isPluginLoaded`.** `DynamicPluginManager.disablePlugin` flips the state
@@ -70,8 +75,22 @@ Three things that are easy to get wrong, all pinned:
   Calling it to find out reveals a panel, and the answer is needed at registration - so the probe
   would pop the notice open by itself. It asks the host's *implementation* class for the method,
   because the api's default no-op body means the interface always has it.
-- **There is no install call, and the button says so.** No plugin-facing api installs another
-  plugin. "Install" opens the Toolbox, with a supporting line saying that is what it does.
+- **Install asks the Toolbox, through a `boss://` deep link.** There is still no plugin-facing api
+  that installs a plugin, and none that dispatches a deep link either - so the URL goes to the
+  *OS*, which owns the `boss://` scheme, and comes back into this same instance through
+  `SingleInstanceManager` to the Toolbox's `DeepLinkActionHandler`. That handler shows a modal
+  confirm naming the plugin **from the store**, and installs on the answer. It exists so a web
+  page can offer Install without being trusted about what is installed, which makes it exactly
+  the right door for a plugin that cannot be trusted about it either.
+
+  Gated on Toolbox **1.9.14**, the release that first carried the handler - an older one has
+  nothing listening, so the link would be a press that does nothing, and the notice falls back to
+  opening the Toolbox panel. Also gated on `Desktop.BROWSE` being supported. Both are injected
+  seams, so the route is testable without a platform.
+
+  The version compare is hand-rolled (`atLeast`): `SemanticVersion` is in the host's
+  `plugin-dependency` module, not on the plugin api. It ignores any `-`/`+` suffix, which is the
+  behaviour we want - a prerelease of the release that added the handler has the handler.
 
 The `methodNamesOf` seam exists because the probe is otherwise untestable: `openPanel` has a
 default body, and Kotlin synthesises an override into every implementing class, so a hand-written

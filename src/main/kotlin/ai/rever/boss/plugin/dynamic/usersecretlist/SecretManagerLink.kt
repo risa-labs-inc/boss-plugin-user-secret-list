@@ -4,13 +4,24 @@ import ai.rever.boss.plugin.api.PanelEventProvider
 import ai.rever.boss.plugin.api.PanelId
 import ai.rever.boss.plugin.api.PluginContext
 import ai.rever.boss.plugin.api.PluginLoaderDelegate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.awt.Desktop
+import java.net.URI
 
 /** What the notice can offer the user, given what this machine and this host can actually do. */
 internal enum class MovedNoticeAction {
     /** Secret Manager is here and this host can reveal panels. */
     OPEN_SECRET_MANAGER,
 
-    /** It is not installed, and this host can at least open the Toolbox to get it. */
+    /**
+     * Not installed, and the Toolbox is new enough to be asked to install it: the press raises
+     * the Toolbox's own confirm dialog, which names the plugin from the store and installs on the
+     * answer. The good case.
+     */
+    INSTALL_VIA_TOOLBOX_PROMPT,
+
+    /** Not installed, and the best available route is opening the Toolbox for the user to look. */
     INSTALL_FROM_TOOLBOX,
 
     /** Nothing to offer: an older host, where a button would do nothing. Say where to look. */
@@ -33,11 +44,17 @@ internal enum class MovedNoticeAction {
 internal fun movedNoticeAction(
     secretManagerInstalled: Boolean,
     canOpenPanels: Boolean,
+    canAskToolboxToInstall: Boolean,
 ): MovedNoticeAction =
     when {
-        !canOpenPanels -> MovedNoticeAction.DESCRIBE_ONLY
-        secretManagerInstalled -> MovedNoticeAction.OPEN_SECRET_MANAGER
-        else -> MovedNoticeAction.INSTALL_FROM_TOOLBOX
+        // Opening needs openPanel; asking the Toolbox to install does not, so the install route
+        // can be live on a host where the open route is not. Kept independent for that reason,
+        // even though a Toolbox new enough to be asked implies a host new enough to open panels.
+        secretManagerInstalled && canOpenPanels -> MovedNoticeAction.OPEN_SECRET_MANAGER
+        secretManagerInstalled -> MovedNoticeAction.DESCRIBE_ONLY
+        canAskToolboxToInstall -> MovedNoticeAction.INSTALL_VIA_TOOLBOX_PROMPT
+        canOpenPanels -> MovedNoticeAction.INSTALL_FROM_TOOLBOX
+        else -> MovedNoticeAction.DESCRIBE_ONLY
     }
 
 /**
@@ -67,6 +84,16 @@ internal class SecretManagerLink(
      */
     private val methodNamesOf: (Any) -> Set<String> = { target ->
         runCatching { target.javaClass.methods.map { it.name }.toSet() }.getOrDefault(emptySet())
+    },
+    /** Whether this JVM can hand a URL to the platform. Injected so the route is testable. */
+    private val browseSupported: () -> Boolean = {
+        runCatching {
+            Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
+        }.getOrDefault(false)
+    },
+    /** Hands [INSTALL_DEEP_LINK] to the platform, which routes it back into this instance. */
+    private val browse: (String) -> Boolean = { url ->
+        runCatching { Desktop.getDesktop().browse(URI(url)); true }.getOrDefault(false)
     },
 ) {
     /**
@@ -118,6 +145,43 @@ internal class SecretManagerLink(
     /** Reveal the Toolbox, where Secret Manager can be installed. */
     suspend fun openToolbox(): Boolean = reveal(TOOLBOX_PANEL)
 
+    /**
+     * Whether the Toolbox can be *asked* to install Secret Manager, rather than merely opened.
+     *
+     * Needs its deep-link handler, which shipped in Toolbox **1.9.14** - so the version is
+     * checked rather than assumed, and an older Toolbox falls back to being opened.
+     */
+    fun canAskToolboxToInstall(): Boolean {
+        if (!browseSupported()) return false
+        val toolbox =
+            runCatching {
+                loader?.getLoadedPlugins()?.firstOrNull { it.pluginId == TOOLBOX_ID }
+            }.getOrNull() ?: return false
+        if (!toolbox.isEnabled || !toolbox.healthy || toolbox.isIncompatible) return false
+        return atLeast(toolbox.version, TOOLBOX_WITH_INSTALL_DEEP_LINK)
+    }
+
+    /**
+     * Asks the Toolbox to install Secret Manager, which raises **its** confirm dialog: the plugin
+     * is named from the store rather than from the link, and nothing installs without the press.
+     *
+     * The route is a `boss://` deep link handed to the OS, because there is no plugin-facing api
+     * that installs a plugin and no way to dispatch a deep link either. The scheme is registered
+     * to BOSS, so the URL comes back into this same running instance through
+     * `SingleInstanceManager` and reaches the Toolbox's `DeepLinkActionHandler`. That handler
+     * exists precisely so a *web page* can offer Install without being trusted about what is
+     * installed - which makes it the right door for a plugin that cannot be trusted about it
+     * either: it refreshes its own view first, and refuses to reinstall something already here.
+     *
+     * On `Dispatchers.IO` because `Desktop.browse` hands off to the platform and can block, and
+     * the caller's scope may be the main one.
+     */
+    suspend fun askToolboxToInstallSecretManager(): Boolean =
+        withContext(Dispatchers.IO) {
+            if (!canAskToolboxToInstall()) return@withContext false
+            browse(INSTALL_DEEP_LINK)
+        }
+
     private suspend fun reveal(panelId: PanelId): Boolean {
         val provider = panels ?: return false
         val window = windowId ?: return false
@@ -131,8 +195,43 @@ internal class SecretManagerLink(
         }
     }
 
+    /**
+     * Compares release cores only (`1.9.14`), ignoring anything after a `-` or `+`.
+     *
+     * Hand-rolled because `SemanticVersion` lives in the host's `plugin-dependency` module, not on
+     * the plugin api - and a prerelease of the release that added the handler does have the
+     * handler, so ignoring the suffix is the behaviour we want anyway.
+     */
+    private fun atLeast(
+        version: String,
+        minimum: List<Int>,
+    ): Boolean {
+        val parts =
+            version
+                .takeWhile { it != '-' && it != '+' }
+                .split('.')
+                .map { it.toIntOrNull() ?: return false }
+        minimum.forEachIndexed { index, floor ->
+            val here = parts.getOrNull(index) ?: 0
+            if (here != floor) return here > floor
+        }
+        return true
+    }
+
     internal companion object {
         const val SECRET_MANAGER_ID = "ai.rever.boss.plugin.dynamic.secretmanager"
+
+        const val TOOLBOX_ID = "ai.rever.boss.plugin.dynamic.pluginmanager"
+
+        /** The Toolbox release that first carried `PluginDeepLinkActions`. */
+        val TOOLBOX_WITH_INSTALL_DEEP_LINK = listOf(1, 9, 14)
+
+        /**
+         * `action=install` rather than `open`: the Toolbox decides from what it finds installed,
+         * so the link cannot be wrong about the outcome - only about what it asks for.
+         */
+        const val INSTALL_DEEP_LINK =
+            "boss://plugin?id=$TOOLBOX_ID&action=install&plugin=$SECRET_MANAGER_ID"
 
         /** Matched by name: it is a suspend function, so its JVM signature carries a Continuation. */
         const val OPEN_PANEL = "openPanel"

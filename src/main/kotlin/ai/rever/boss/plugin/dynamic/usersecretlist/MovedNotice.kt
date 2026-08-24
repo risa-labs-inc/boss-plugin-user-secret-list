@@ -65,7 +65,13 @@ internal fun MovedNotice(
     // when the plugin loaded would still say "not installed" and offer the Toolbox again.
     var installed by remember { mutableStateOf(link?.secretManagerInstalled() == true) }
     val canOpenPanels = remember(link) { link?.canOpenPanels() == true }
-    val action = movedNoticeAction(secretManagerInstalled = installed, canOpenPanels = canOpenPanels)
+    val canAskToolboxToInstall = remember(link) { link?.canAskToolboxToInstall() == true }
+    val action =
+        movedNoticeAction(
+            secretManagerInstalled = installed,
+            canOpenPanels = canOpenPanels,
+            canAskToolboxToInstall = canAskToolboxToInstall,
+        )
     val scope = rememberCoroutineScope()
 
     // Two-step rather than a dialog: BossDialog lives in plugin-ui-core above this plugin's 1.0.20
@@ -132,10 +138,28 @@ internal fun MovedNotice(
                             onClick = { scope.launch { link?.openSecretManager() } },
                         )
 
+                    MovedNoticeAction.INSTALL_VIA_TOOLBOX_PROMPT ->
+                        NoticeButton(
+                            label = "Install Secret Manager",
+                            icon = Icons.Default.Lock,
+                            // The Toolbox asks; this button only requests. Saying so beats a press
+                            // that appears to do nothing while a dialog is on its way.
+                            supporting = "The Toolbox will ask you to confirm.",
+                            onClick = {
+                                scope.launch {
+                                    // Falls back to opening the Toolbox if the request does not
+                                    // land, so the press is never a no-op.
+                                    if (link?.askToolboxToInstallSecretManager() != true) {
+                                        link?.openToolbox()
+                                    }
+                                }
+                            },
+                        )
+
                     MovedNoticeAction.INSTALL_FROM_TOOLBOX ->
                         NoticeButton(
-                            // Says what it does. No plugin-facing api installs another plugin, so
-                            // this opens the Toolbox rather than implying a one-press install.
+                            // An older Toolbox, with no handler to ask. Says what it does rather
+                            // than implying a one-press install.
                             label = "Install Secret Manager",
                             icon = Icons.Default.Lock,
                             supporting = "Opens the Toolbox, where you can install it.",

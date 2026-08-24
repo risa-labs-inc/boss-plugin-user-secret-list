@@ -30,13 +30,18 @@ getting to Secret Manager, and one for removing this panel entirely:
 | Secret Manager | The notice offers |
 |---|---|
 | installed and enabled | **Open Secret Manager** |
-| absent, disabled, unhealthy or incompatible | **Install Secret Manager**, which opens the Toolbox |
+| absent, disabled, unhealthy or incompatible | **Install Secret Manager** - the Toolbox asks you to confirm, then installs |
 | either, on a host older than api 1.0.57 | no button - text saying where to look |
 
-The button says what it does. **No plugin-facing api installs another plugin** (the host's own
-installer is what resolves a store row to a jar, which is why the Toolbox has a deep-link handler
-for web pages), so "Install" opens the Toolbox rather than implying a one-press install this
-cannot perform.
+**No plugin-facing api installs another plugin**, and none dispatches a deep link either - so
+Install hands a `boss://plugin?…&action=install&plugin=…` URL to the OS, which owns that scheme
+and routes it back into this instance, to the Toolbox's own deep-link handler. The Toolbox then
+shows a confirm dialog naming the plugin *from the store* and installs on the answer. That handler
+exists so a web page can offer Install without being trusted about what is installed, which makes
+it the right door for a plugin that cannot be trusted about it either.
+
+It needs Toolbox **1.9.14** or newer (the release that added the handler); on an older one the
+button falls back to opening the Toolbox, and says so.
 
 "Installed" is read from `getLoadedPlugins()` and requires `isEnabled`, `healthy` and
 `!isIncompatible` - not `isPluginLoaded`, which was the first version and is wrong in a way that
@@ -87,7 +92,7 @@ those installs. `RetirementManifestTest` pins both, and the dependency declarati
 
 ```bash
 ./gradlew buildPluginJar
-./gradlew test    # 31 cases: the manifest facts, the notice's buttons, the self-uninstall
+./gradlew test    # 41 cases: the manifest facts, the notice's buttons, the self-uninstall
 ```
 
 ## License

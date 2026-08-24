@@ -22,7 +22,7 @@ class SecretManagerLinkTest {
     fun `an installed Secret Manager gets an Open button`() {
         assertEquals(
             MovedNoticeAction.OPEN_SECRET_MANAGER,
-            movedNoticeAction(secretManagerInstalled = true, canOpenPanels = true),
+            movedNoticeAction(secretManagerInstalled = true, canOpenPanels = true, canAskToolboxToInstall = true),
         )
     }
 
@@ -30,9 +30,143 @@ class SecretManagerLinkTest {
     fun `a missing Secret Manager gets an Install button`() {
         assertEquals(
             MovedNoticeAction.INSTALL_FROM_TOOLBOX,
-            movedNoticeAction(secretManagerInstalled = false, canOpenPanels = true),
+            movedNoticeAction(secretManagerInstalled = false, canOpenPanels = true, canAskToolboxToInstall = false),
         )
     }
+
+    @Test
+    fun `a Toolbox that can be asked gets the prompt route, not just an open`() {
+        // The difference the user sees: a confirm dialog that installs, rather than a panel to go
+        // hunting in.
+        assertEquals(
+            MovedNoticeAction.INSTALL_VIA_TOOLBOX_PROMPT,
+            movedNoticeAction(
+                secretManagerInstalled = false,
+                canOpenPanels = true,
+                canAskToolboxToInstall = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `the prompt route does not need openPanel`() {
+        // Asking the Toolbox goes through a boss:// link, not PanelEventProvider - so it works on
+        // a host too old for openPanel, which is the population this plugin exists to reach.
+        assertEquals(
+            MovedNoticeAction.INSTALL_VIA_TOOLBOX_PROMPT,
+            movedNoticeAction(
+                secretManagerInstalled = false,
+                canOpenPanels = false,
+                canAskToolboxToInstall = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `an installed Secret Manager on a host that cannot open panels describes instead`() {
+        // Never the Install route: it is installed, so offering to install it would be wrong even
+        // though the open route is unavailable.
+        assertEquals(
+            MovedNoticeAction.DESCRIBE_ONLY,
+            movedNoticeAction(
+                secretManagerInstalled = true,
+                canOpenPanels = false,
+                canAskToolboxToInstall = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `the Toolbox is asked only when its version carries the handler`() {
+        // PluginDeepLinkActions shipped in Toolbox 1.9.14. Older ones have nothing listening, so
+        // the link would be a press that does nothing.
+        assertTrue(linkWithToolbox("1.9.14").canAskToolboxToInstall())
+        assertTrue(linkWithToolbox("1.9.21").canAskToolboxToInstall())
+        assertTrue(linkWithToolbox("2.0.0").canAskToolboxToInstall())
+        assertFalse(linkWithToolbox("1.9.13").canAskToolboxToInstall())
+        assertFalse(linkWithToolbox("1.8.99").canAskToolboxToInstall())
+        assertFalse(linkWithToolbox("0.9.0").canAskToolboxToInstall())
+    }
+
+    @Test
+    fun `a prerelease of the release that added the handler counts`() {
+        // The suffix is ignored on purpose: 1.9.14-rc.1 is built from the source that has it.
+        assertTrue(linkWithToolbox("1.9.14-rc.1").canAskToolboxToInstall())
+        assertTrue(linkWithToolbox("1.9.21+build.7").canAskToolboxToInstall())
+    }
+
+    @Test
+    fun `an unparseable Toolbox version is not asked`() {
+        assertFalse(linkWithToolbox("dev").canAskToolboxToInstall())
+        assertFalse(linkWithToolbox("").canAskToolboxToInstall())
+    }
+
+    @Test
+    fun `a disabled or unhealthy Toolbox is not asked`() {
+        assertFalse(linkWithToolbox("1.9.21", enabled = false).canAskToolboxToInstall())
+        assertFalse(linkWithToolbox("1.9.21", healthy = false).canAskToolboxToInstall())
+        assertFalse(linkWithToolbox("1.9.21", incompatible = true).canAskToolboxToInstall())
+    }
+
+    @Test
+    fun `a JVM that cannot hand a URL to the platform is not asked`() {
+        // Headless, or a platform with no BROWSE action: the link would go nowhere.
+        assertFalse(linkWithToolbox("1.9.21", browseSupported = false).canAskToolboxToInstall())
+    }
+
+    @Test
+    fun `asking sends the install deep link for Secret Manager, addressed to the Toolbox`() =
+        runBlocking {
+            val sent = mutableListOf<String>()
+            val link = linkWithToolbox("1.9.21", onBrowse = { sent += it })
+
+            assertTrue(link.askToolboxToInstallSecretManager())
+
+            assertEquals(1, sent.size)
+            val url = sent.single()
+            assertTrue(url.contains("id=${SecretManagerLink.TOOLBOX_ID}"), url)
+            assertTrue(url.contains("action=install"), url)
+            assertTrue(url.contains("plugin=${SecretManagerLink.SECRET_MANAGER_ID}"), url)
+        }
+
+    @Test
+    fun `asking an old Toolbox sends nothing at all`() =
+        runBlocking {
+            // Better a false return the caller can fall back from than a link nobody handles.
+            val sent = mutableListOf<String>()
+            val link = linkWithToolbox("1.9.13", onBrowse = { sent += it })
+
+            assertFalse(link.askToolboxToInstallSecretManager())
+            assertTrue(sent.isEmpty())
+        }
+
+    private fun linkWithToolbox(
+        toolboxVersion: String,
+        enabled: Boolean = true,
+        healthy: Boolean = true,
+        incompatible: Boolean = false,
+        browseSupported: Boolean = true,
+        onBrowse: (String) -> Unit = {},
+    ) = SecretManagerLink(
+        loader =
+            FakeLoader(
+                listOf(
+                    LoadedPluginInfo(
+                        pluginId = SecretManagerLink.TOOLBOX_ID,
+                        displayName = "Toolbox",
+                        version = toolboxVersion,
+                        isEnabled = enabled,
+                        healthy = healthy,
+                        isIncompatible = incompatible,
+                    ),
+                ),
+            ),
+        panels = RecordingPanels(),
+        windowId = "w",
+        methodNamesOf = { setOf("openPanel") },
+        browseSupported = { browseSupported },
+        browse = { onBrowse(it); true },
+    )
 
     @Test
     fun `a host that cannot open panels gets no button either way`() {
@@ -40,11 +174,11 @@ class SecretManagerLinkTest {
         // dead in both states, and text that says where to look is better than a dead control.
         assertEquals(
             MovedNoticeAction.DESCRIBE_ONLY,
-            movedNoticeAction(secretManagerInstalled = true, canOpenPanels = false),
+            movedNoticeAction(secretManagerInstalled = true, canOpenPanels = false, canAskToolboxToInstall = false),
         )
         assertEquals(
             MovedNoticeAction.DESCRIBE_ONLY,
-            movedNoticeAction(secretManagerInstalled = false, canOpenPanels = false),
+            movedNoticeAction(secretManagerInstalled = false, canOpenPanels = false, canAskToolboxToInstall = false),
         )
     }
 
@@ -123,7 +257,7 @@ class SecretManagerLinkTest {
         assertFalse(link.secretManagerInstalled())
         assertEquals(
             MovedNoticeAction.INSTALL_FROM_TOOLBOX,
-            movedNoticeAction(link.secretManagerInstalled(), link.canOpenPanels()),
+            movedNoticeAction(link.secretManagerInstalled(), link.canOpenPanels(), canAskToolboxToInstall = false),
         )
     }
 
